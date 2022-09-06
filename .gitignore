@@ -26,3 +26,9 @@ yarn-error.log*
 /ideas
 /bitbucket-pipelines.yml
 /build.gradle
+/package-lock.json
+/tsconfig.json
+/src/react-app-env.d.ts
+/src/reportWebVitals.ts
+/src/setupTests.ts
+*.test.tsx
