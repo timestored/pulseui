@@ -1,5 +1,7 @@
 # pulse
 
+![Pulse](/multi-chart3-dark.jpg)
+
 Pulse is a tool for real-time visual analysis, email reporting and alerting.
 It allows you to create and share real-time interactive applications with your team.
 
