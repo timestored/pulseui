@@ -1,7 +1,7 @@
 import React, { useState, useEffect, Component } from 'react';
 import axios from 'axios';
 import { Number, String, Array, Record, Static, Undefined, Partial } from 'runtypes';
-import { Alert, Button, FormGroup, HTMLTable, InputGroup, Intent, Spinner, MaybeElement, Icon, IconName, HTMLSelect, SpinnerSize } from '@blueprintjs/core';
+import { Alert, Button, FormGroup, HTMLTable, InputGroup, Intent, Spinner, MaybeElement, Icon, IconName, HTMLSelect, SpinnerSize, Collapse } from '@blueprintjs/core';
 import { SERVER } from '../engine/queryEngine';
 import { MyInput, MyOverlay } from './CommonComponents';
 import { Enumify } from 'enumify';
@@ -10,7 +10,8 @@ import { SiMysql, SiPostgresql } from "react-icons/si";
 import { DiMsqlServer } from "react-icons/di";
 import { analytics } from '../App';
 
-const newServerConfig: ServerConfig = { id: -1, name: "", host: "localhost", port: 5000, jdbcType: "KDB", database: "", username: "", password: "", url: undefined };
+const newServerConfig: ServerConfig = { id: -1, name: "", host: "localhost", port: 5000, jdbcType: "KDB", database: "", username: "", password: "", 
+                url: undefined, queryWrapPre:"", queryWrapPost:"" };
 
 const ServerConfigR = Record({
     id: Number,
@@ -22,7 +23,9 @@ const ServerConfigR = Record({
     database: String.Or(Undefined),
     url: String.Or(Undefined),
     username: String.Or(Undefined),
-    password: String.Or(Undefined)}));
+    password: String.Or(Undefined),
+    queryWrapPre: String.Or(Undefined),
+    queryWrapPost: String.Or(Undefined),}));
 export type ServerConfig = Static<typeof ServerConfigR>;
 
 
@@ -39,11 +42,13 @@ function ConnectionsPage() {
     const [serverConfigs, setServerConfigs] = useState<ServerConfig[]>([]);
     const [deleteId, setDeleteId] = useState<ServerConfig>();
     const [editId, setEditId] = useState<ServerConfig>();
+    const [editServerList, setEditServerList] = useState<boolean>(false);
 
     const addConn = (jc: jdbcConnection) => {
         let sc: ServerConfig = {
             id: -1, name: jc.name + ":" + jc.defaultPort, username: jc.defaultUsername, port: jc.defaultPort,
-            host: "localhost", jdbcType: jc.name, database: undefined, url: undefined, password: undefined
+            host: "localhost", jdbcType: jc.name, database: undefined, url: undefined, password: undefined,
+            queryWrapPre: undefined, queryWrapPost:undefined
         };
         const run = async () => {
             axios.post<ServerConfig>(SERVER + "/dbserver", sc)
@@ -69,12 +74,14 @@ function ConnectionsPage() {
     useEffect(() => { document.title = "Connections" }, []);
     const clearSelection = () => {
         setEditId(undefined);
+        setEditServerList(false);
         fetchProcessServers(setServerConfigs);
     }
     const isEmpty = serverConfigs.length === 0;
 
     return <><div>
-        <Button icon="add" small onClick={() => { setEditId(newServerConfig); }} intent="success">Add Data Connection</Button>
+        <Button icon="add" small onClick={() => { setEditId(newServerConfig); }} >Add Data Connection</Button>
+        <Button icon="edit" small onClick={() => { setEditServerList(true); }} >Add Server List</Button>
         {isEmpty ?
             <ConnectionHelp addConn={addConn} />
             : <HTMLTable condensed striped bordered interactive>
@@ -106,10 +113,53 @@ function ConnectionsPage() {
         <MyOverlay isOpen={editId !== undefined} handleClose={clearSelection} title={(editId?.id === -1 ? "Add" : "Edit") + " Data Connection"}>
             <ConnectionsEditor serverConfig={editId!} clearSelection={clearSelection} />
         </MyOverlay>
+        <MyOverlay isOpen={editServerList} handleClose={clearSelection} title="Add Server List">
+            <ServerListEditor clearSelection={clearSelection} />        
+        </MyOverlay>
 
     </div></>
 }
 export default ConnectionsPage;
+
+
+
+function ServerListEditor(props:{clearSelection:()=>void}) {
+    const DEFAULT_LIST = "my-server-name@localhost:5000\npro-server@localhost:5002:username:password\n127.0.0.1:5001";
+    const [txt, setTxt] = useState(DEFAULT_LIST);
+    const [ajax, setAjax] = useState<AjaxResult>({state:""});
+
+    const saveConnections = () => {
+        setAjax({ state: "running" });
+        const run = async () => {
+            axios.post(SERVER + "/dbserver/add-conns", txt, {headers:{"Content-Type":"text/plain"}, responseType: 'text'})
+            .then(r => {
+                if(typeof r.data === "string") {
+                    if(r.data.length > 0) {
+                        notyf.error("Error saving connections.");
+                        setAjax({ state: "failed" });
+                        setTxt(r.data);
+                    } else {
+                        setAjax({ state: "succeeded" });
+                        props.clearSelection();
+                    }
+                }
+            }).catch((e) => {
+                notyf.error("Error saving connections.");
+                setAjax({ state: "failed", msg:e });
+            });
+        };
+        run();
+        analytics.track("Connection - Bulk Add");
+    }
+
+    return (<div>
+        <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); saveConnections(); }}>
+            <textarea rows={20} cols={100} style={{width:"90%"}} placeholder={txt} value={txt} onChange={s => setTxt(s.target.value)} />
+            <br /><Button intent="primary" type="submit" disabled={txt === DEFAULT_LIST || txt.length === 0}>Add</Button>  
+                  <Button onClick={props.clearSelection}>Close</Button>    
+            <br/><AjaxResButton mystate={ajax} succeededMsg="Saved" />
+        </form></div>);
+  }
 
 interface EditorProps {
     serverConfig: ServerConfig | undefined;
@@ -125,7 +175,11 @@ interface ConnectionsEditorState {
     serverConfig: ServerConfig,
     testState: AjaxResult,
     saveState: AjaxResult,
+    showAdvanced: boolean,
 }
+
+
+
 class ConnectionsEditor extends Component<EditorProps, ConnectionsEditorState> {
 
     constructor(props: EditorProps) {
@@ -133,7 +187,7 @@ class ConnectionsEditor extends Component<EditorProps, ConnectionsEditorState> {
         let sc = this.props.serverConfig ?
             this.props.serverConfig :
             newServerConfig;
-        this.state = { serverConfig: sc, testState: { state: "" }, saveState: { state: "" } };
+        this.state = { serverConfig: sc, testState: { state: "" }, saveState: { state: "" }, showAdvanced:false };
     }
 
     testConn = () => {
@@ -185,6 +239,7 @@ class ConnectionsEditor extends Component<EditorProps, ConnectionsEditorState> {
         const handleChange = (e: React.FormEvent<HTMLInputElement>) => {
             setMerged(e.currentTarget.name, e.currentTarget.value);
         };
+        const isKDB = (sc.jdbcType === "KDB" || sc.jdbcType === "KDB_STREAMING");
 
         return <>
             <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); this.saveConn(); }}>
@@ -192,15 +247,25 @@ class ConnectionsEditor extends Component<EditorProps, ConnectionsEditorState> {
                 <JdbcSelect jdbcTypeSelected={sc.jdbcType} onChange={e => { setMerged("jdbcType", e.currentTarget.value) }} />
                 <MyInput label="Host:" value={sc.host} name="host" onChange={handleChange} placeholder="localhost or server.com" />
                 <MyInput label="Port:" value={sc.port ? "" + sc.port : ""} name="port" onChange={e => { setMerged("port", parseInt(e.currentTarget.value)) }} placeholder="3306" />
-                {(sc.jdbcType !== "KDB") && <MyInput label="Database:" value={sc.database} name="database" onChange={handleChange} />}
+                {(!isKDB) && <MyInput label="Database:" value={sc.database} name="database" onChange={handleChange} />}
                 <br />
                 <FormGroup label="Username:" labelFor="connUser" inline labelInfo="(optional)" >
                     <InputGroup id="connUser" value={sc.username} name="username" onChange={handleChange} />
                 </FormGroup>
                 <FormGroup label="Password:" labelFor="connPass" inline labelInfo="(optional)">
                     <InputGroup id="connPass" value={sc.password} type="password" name="password" onChange={handleChange} /></FormGroup>
-                <p className="bp4-text-muted">If the username/password is supplied it will be shared by all users.
-                    <br />If not supplied, each user will have to supply their database login details.</p>
+                {/* <p className="bp4-text-muted">If the username/password is supplied it will be shared by all users.
+                    <br />If not supplied, each user will have to supply their database login details.</p> */}
+
+                {isKDB &&  
+                    <div>
+                        <Button onClick={() => this.setState({showAdvanced:!this.state.showAdvanced})}>{(this.state.showAdvanced ? "Hide" : "Show") + " Advanced Options"}</Button>
+                        <Collapse isOpen={this.state.showAdvanced}>
+                        <MyInput label="Query Pre-Wrap:" value={sc.queryWrapPre} name="queryWrapPre" onChange={handleChange} />
+                        <MyInput label="Query Post-Wrap:" value={sc.queryWrapPost} name="queryWrapPost" onChange={handleChange} />
+                        </Collapse>
+                    </div>}
+
                 <Button intent="primary" type="submit" disabled={this.state.testState.state === "failed" || this.state.saveState.state === "running"}>{isAdd ? "Add" : "Save"}</Button>&nbsp;
                 <Button intent="success" onClick={this.testConn}>Test</Button>
                 <AjaxResButton mystate={this.state.testState} succeededMsg="Connected" />
@@ -212,7 +277,7 @@ class ConnectionsEditor extends Component<EditorProps, ConnectionsEditorState> {
 }
 
 export function JdbcSelect(props: { jdbcTypeSelected?: string, onChange: (e: React.FormEvent<HTMLSelectElement>) => void }) {
-    const types = { "KDB": "Kdb", "KDB_STREAMING":"Kdb Streaming", "POSTGRES": "Postgres", "CLICKHOUSE": "Clickhouse", "MSSERVER": "Microsoft SQL Server", "H2": "H2", "MYSQL": "MySQL" };
+    const types = { "KDB": "Kdb", "KDB_STREAMING":"Kdb Streaming", "POSTGRES": "Postgres", "CLICKHOUSE": "Clickhouse", "MSSERVER": "Microsoft SQL Server", "H2": "H2", "MYSQL": "MySQL", "CUSTOM": "Customized JDBC Driver" };
     return <>
         <FormGroup label="Type:" labelFor="connType" inline>
             <HTMLSelect onChangeCapture={props.onChange}>
@@ -273,13 +338,14 @@ function JdbcCoverPanel(props: { jdbcConn: jdbcConnection, addConn: (jc: jdbcCon
 
 
 class jdbcConnection extends Enumify {
-    static KDB = new jdbcConnection("KDB", "Kdb", "database", "/img/kx.png", 5000, undefined, false);
-    static KDB_STREAMING = new jdbcConnection("KDB_STREAMING", "Kdb Subscription", "database", "/img/kx.png", 5000, undefined, false);
-    static POSTGRES = new jdbcConnection("POSTGRES", "Postgres", <SiPostgresql />, "/img/postgres-logo.png", 5432, "postgres");
-    static CLICKHOUSE = new jdbcConnection("CLICKHOUSE", "Clickhouse", "database", "/img/clickhouse-logo.png", 8123);
-    static MSSERVER = new jdbcConnection("MSSERVER", "Microsoft SQL Server", <DiMsqlServer />, "/img/mssql-logo.png", 1433, "sa");
-    static H2 = new jdbcConnection("H2", "H2", "database", "/img/h2-logo.png", 8082);
-    static MYSQL = new jdbcConnection("MYSQL", "MYSQL", <SiMysql />, "/img/mysql-logo.png", 3306, "root");
+    static KDB = new jdbcConnection("KDB", "Kdb", "database", "./img/kx.png", 5000, undefined, false);
+    static KDB_STREAMING = new jdbcConnection("KDB_STREAMING", "Kdb Subscription", "database", "./img/kx.png", 5000, undefined, false);
+    static POSTGRES = new jdbcConnection("POSTGRES", "Postgres", <SiPostgresql />, "./img/postgres-logo.png", 5432, "postgres");
+    static CLICKHOUSE = new jdbcConnection("CLICKHOUSE", "Clickhouse", "database", "./img/clickhouse-logo.png", 8123);
+    static MSSERVER = new jdbcConnection("MSSERVER", "Microsoft SQL Server", <DiMsqlServer />, "./img/mssql-logo.png", 1433, "sa");
+    static H2 = new jdbcConnection("H2", "H2", "database", "./img/h2-logo.png", 8082);
+    static MYSQL = new jdbcConnection("MYSQL", "MYSQL", <SiMysql />, "./img/mysql-logo.png", 3306, "root");
+    static CUSTOM = new jdbcConnection("CUSTOM", "Custom JDBC", "database", "./img/clickhouse-logo.png", 5000, undefined, false);
     static _ = jdbcConnection.closeEnum();
 
     constructor(readonly name: string, readonly niceName: string, readonly icon: IconName | MaybeElement,

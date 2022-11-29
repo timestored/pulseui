@@ -1,4 +1,5 @@
 import assert from "assert";
+import { SFormatters } from "../components/AGrid";
 
 /**
  * Decorates a resultSet to provide a data structure easier to access for charting.
@@ -25,11 +26,12 @@ export default class ChartResultSet {
         this.rowLabels = [];
         this.rowTitle = "";
 
-        if(rsdata.tbl === undefined || rsdata.tbl.data === undefined || rsdata.tbl.data.length === 0) {
+        if(rsdata.tbl === undefined || rsdata.tbl.data === undefined) {
             return;
         }
         let d = rsdata.tbl.data;
-        let colNames = Object.keys(d[0]);
+        // Use column names from data if it's there. If data is empty fallback to types.
+        let colNames = Object.keys(d.length > 0 ? d[0] : rsdata.tbl.types); 
         for(let c = 0; c < colNames.length; c++) {
             let cn = colNames[c];
             let firstVal = undefined;
@@ -43,35 +45,38 @@ export default class ChartResultSet {
                     dates.push(new Date((d[r])[cn] as number));
                 }
                 this.dateColumns.push(new Col(cn, dates));
-            } else if(typeof(firstVal) === "number") {
+                this.stringyColumns.push(new Col(cn, dates.map(d => SFormatters.formatTime(0, 0, d, null, null))));
+            } else if(rsdata.tbl.types[cn] === "number" || typeof(firstVal) === "number") {
                 let nums:Array<number> = [];
                 for(let r = 0; r < d.length; r++) {
                     nums.push((d[r])[cn] as number);
                 }
                 this.numericColumns.push(new Col(cn, nums));
-            } else if(typeof(firstVal) === "string") {
+            } else if(rsdata.tbl.types[cn] === "string" || typeof(firstVal) === "string") {
                 this.rowTitle += (this.rowTitle === "" ? "" : " - ") + cn;
                 let strs:Array<string> = [];
                 for(let r = 0; r < d.length; r++) {
                     strs.push((d[r])[cn] as string);
                 }
                 this.stringyColumns.push(new Col(cn, strs));
-            } else if((firstVal) instanceof Date) {
+            } else if(rsdata.tbl.types[cn] === "Date" || (firstVal) instanceof Date) {
                 this.rowTitle += (this.rowTitle === "" ? "" : " - ") + cn;
                 let dates:Array<Date> = [];
                 for(let r = 0; r < d.length; r++) {
                     dates.push((d[r])[cn] as Date);
                 }
                 this.dateColumns.push(new Col(cn, dates));
+                this.stringyColumns.push(new Col(cn, dates.map(d => SFormatters.formatDate(0, 0, d, null, null))));
+                
             }
         }
 
-        this.rowLabels = ChartResultSet.generateRowLabels(this.stringyColumns);
+        this.rowLabels = ChartResultSet.generateRowLabels(this.stringyColumns, d.length);
     }
 
-    private static generateRowLabels(stringyColumns:Array<Col<string>>):Array<string> {
+    private static generateRowLabels(stringyColumns:Array<Col<string>>, rowCount:number):Array<string> {
         if(stringyColumns.length === 0) {
-            return [];
+            return Array(rowCount).fill(0).map((v,i)=>""+(1+i)); // no string columns, use row numbers
         }
         let res:Array<string> = [];
         let rows = (stringyColumns[0]).vals.length;
@@ -109,7 +114,7 @@ export class SmartRs {
                 if(value === 'Date') {
                     for (var i = 0; i < rsdata.tbl.data.length; i++) {
                         let v = rsdata.tbl.data[i][key];
-                        if(v) {
+                        if(v && !(v instanceof Date)) {
                             rsdata.tbl.data[i][key] = new Date(v);
                         }
                     } 
@@ -121,6 +126,23 @@ export class SmartRs {
     }
 
     count():number { return this.d().length; }
+    
+    findColumn(name:string):string | undefined { 
+        if(this.count()<1) {
+            return undefined;
+        }
+        return Object.keys(this.rsdata.tbl.data[0]).find(e => e.toUpperCase() === name.toUpperCase());
+    }
+    getRange<T>(vals:T[]):T[] {
+        if(vals.length < 1) { return []; }
+        const min = vals.reduce((p,v) => v < p ? v : p);
+        const max = vals.reduce((p,v) => v > p ? v : p);
+        return [min, max];
+    }
+    getDateRange():Date[] {
+        if(this.chartRS.dateColumns.length < 1) { return []; }
+        return this.getRange(this.chartRS.dateColumns[0].vals);
+    }
 }
 
 export const EmptySmartRs = new SmartRs(EmptyRsData);

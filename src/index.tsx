@@ -8,11 +8,12 @@ const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
 root.render(
-  <React.StrictMode> 
+  // Strict mode turned off to allow caplin flexlayout popouts to work for now. 
+  // <React.StrictMode> 
   <HotkeysProvider>
     <App />
     </HotkeysProvider>
-  </React.StrictMode>
+  // </React.StrictMode>
 );
 
 

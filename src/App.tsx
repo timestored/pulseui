@@ -24,6 +24,8 @@ import axios from 'axios';
 import { LoginPage, LoginResponse } from './auth';
 import UserPage from './components/UserPage';
 import DashReportPage from './components/DashReportPage';
+import { notyf } from './context';
+import { get } from 'lodash-es';
 
 
 const myPlugin = {
@@ -39,64 +41,136 @@ const myPlugin = {
     axios.post(SERVER + "/analytics/event", { date: meta.ts, event:event, anonymousId: anonymousId, userId: userId, ...properties });
   },
 }
-export const analytics = Analytics({ app: 'Pulse', debug:true, plugins: [myPlugin] })
+let myPlugins = [myPlugin];
+
+if(window.location.href.indexOf("timestored.com") !== -1) {
+  // Initialize with your site ID and Matomo URL
+  const MURL = "https://www.timestored.com/mat/matomo.php";
+  const eventDets = { 'idsite':1, rec:1, 'apiv':1, };
+  const paramsSerializer = (params:any) => {
+      // Sample implementation of query string building
+      let result = '';
+      Object.keys(params).forEach(key => {
+          result += `${key}=${encodeURIComponent(params[key])}&`;
+      });
+      return result.substring(0, result.length - 1);
+  }
+  const matomoPlugin = {
+    name: 'matomoPlugin', //@ts-ignore
+    page: ({ payload }) => {
+      const { meta } = payload;
+      const offerId = window.localStorage.getItem('offerId');
+      const uid = offerId !== null ? offerId : (payload.userId || payload.anonymousId);
+      try {
+        const eevent = { 
+          ...eventDets,
+          'uid': uid,
+          'url':window.location.href,
+          'action_name':document.title,
+          'cdt': meta.ts
+        };
+        axios && axios.get(MURL, {params:eevent, paramsSerializer:paramsSerializer});
+      } catch {}
+    },//@ts-ignore
+    track: ({ payload }) => {
+      const { meta, properties, event } = payload;
+      const offerId = window.localStorage.getItem('offerId');
+      const uid = offerId !== null ? offerId : (payload.userId || payload.anonymousId);
+      const eevent = { // e_c/a/n/v = category, action, name, value
+        ...eventDets,
+        'uid': uid,
+        'url': window.location.href,
+        'cdt': meta.ts,
+        'e_c': event,
+        'e_a': event,
+        'e_n': properties.dashName,
+        'e_v': properties.dashId
+      };
+      axios && axios.get(MURL, {params:eevent, paramsSerializer:paramsSerializer});
+    },
+  };
+  myPlugins = [myPlugin, matomoPlugin];
+}
+
+
+export const analytics = Analytics({ app: 'Pulse', debug:true, plugins: myPlugins })
 
 export const ANAME = "Pulse"
 export const aNAME = "pulse"
 
-export function Logo(props:{light?:boolean}) { 
-  const context = useContext(ThemeContext);
-  let showLight = context.theme === "dark";
-  if(props.light !== undefined) {
-    showLight = props.light;
-  }
-  return <img src={(showLight ? "/img/logo-white.png" : "/img/logo.png")} width="134" height="37" alt={ANAME} />; 
-}
+export function Logo(props:{light?:boolean}) {  return <div className="logoImg" ></div>;  }
 
-export function isBorderless() { return window.location.search.toLowerCase().indexOf("noborder") >= 0 };
+export function isBorderless() { return new URLSearchParams(window.location.search).get("sd_noborder") === "1" };
+
+
+axios.interceptors.request.use(
+  config => { //if (allowedOrigins.includes(origin)) { 
+    const tok = localStorage.getItem("token");
+    if(tok != null) { 
+      if(!config.headers) { config.headers = {}; }
+      config.headers.authorization = `Bearer ${tok}`;
+    }
+    return config;
+  }, 
+  error => {   return Promise.reject(error);   },
+  { synchronous: true }
+);
+axios.interceptors.response.use(function (response) {
+  // Any status code that lie within the range of 2xx cause this function to trigger
+  return response;
+}, function (error) {
+  // Assumes any error is a login problem and redirects. Unless already attempting login.
+  if(error.response.status === 401 && !error.request.responseURL.endsWith("/login")) {
+    localStorage.removeItem("token");
+    window.location.href = "/rlogout";
+  } else {
+    notyf.error(error);
+  }
+  return Promise.reject(error);
+});
+
+export function getSubdomain() {
+  const ru = get(window,"pulseconfig.rootURL",undefined) as string;
+  if(ru !== undefined && typeof ru === "string") {
+    const p = ru.indexOf("/");
+    if(p > 0) {
+      const afterHttp = ru.length > p && ru.charAt(p+1) === '/' ? ru.substring(p+2) : ru.substring(p+1);
+      const q = afterHttp.indexOf("/");
+      if(q > 0) {
+        return afterHttp.substring(q);
+      }
+    }
+  }
+  return undefined;
+}
 
 export default function App() {
 
-  const [theme, setTheme] = useLocalStorage("theme", "light" as ThemeType);
+  const [theme, setTheme] = useLocalStorage("theme", "dark" as ThemeType);
   const [login, setLogin] = useLocalStorage<LoginResponse | undefined>("user", undefined);
   const toggleTheme = () => { setTheme(theme === "dark" ? "light" : "dark"); };
   const context = useMemo(() => {return { theme: theme, login:login }}, [theme,login]);
 
-  useEffect(() => {
-    if(login) {
-      const myInterceptor = axios.interceptors.request.use(
-        config => { //if (allowedOrigins.includes(origin)) { 
-          if(login) { 
-            if(!config.headers) { config.headers = {}; }
-            config.headers.authorization = `Bearer ${login.access_token}`;
-          }
-          return config;
-        }, 
-        error => { return Promise.reject(error); }
-      );
-      return () => { axios.interceptors.request.eject(myInterceptor); }
-    }
-  },[login]);
   
   function loginCallBack(lr:LoginResponse) {
-    setLogin(lr); 
+    localStorage.setItem("token",lr.access_token);
+    setLogin(lr);
     try { analytics.identify(lr.username); } catch { console.error("analytics error getting user"); }
   }
 
   function logoutCallBack() {
     setLogin(undefined); 
-    try { analytics.reset(); } catch { console.error("analytics error resetting"); }
+    // try { analytics.reset(); } catch { console.error("analytics error resetting"); }
   }
 
   const rightOptions = <div>
     <Button icon={theme === "dark" ? "lightbulb" : "moon"} onClick={toggleTheme} minimal></Button>
   </div>;
-  document.body.style.background = theme === "dark" ? '#293742' : '';
+  document.body.className = theme === "dark" ? 'bodydark' : 'bodylight';
   
-  const wrap = (children: React.ReactNode, selected: selOption = undefined, classOverride:string | undefined = undefined, largeFooter:boolean = false) => {
+  const wrap = (children: React.ReactNode, selected: selOption = undefined, classOverride:string | undefined = undefined) => {
     return (<div id="appPage"><MyNavBar selected={selected} rightChildren={rightOptions} />
           <div className={classOverride !== undefined ? classOverride : "page"}>{children} </div>
-        <Footer largeFooter={largeFooter} />
         </div>)
   }
 
@@ -106,11 +180,12 @@ export default function App() {
       
         {themeContext =>
             
-          <BrowserRouter>
+          <BrowserRouter basename={getSubdomain()}>
             <AppPageContainer>
+            <ScrollToTop>
             <Routes>
-              <Route path="/login" element={wrap(<LoginPage logincallBack={loginCallBack} />,undefined, "page loginPage")} />
-              <Route path="/logout" element={wrap(<LogoutPage logoutCallBack={logoutCallBack} />)} />
+              <Route path="/rlogin" element={wrap(<LoginPage logincallBack={loginCallBack} />,undefined, "page loginPage")} />
+              <Route path="/rlogout" element={wrap(<LogoutPage logoutCallBack={logoutCallBack} />)} />
               {/* Allows individual charts to pop out */}
               <Route path="/dash/popout.html" element={<div />} />
               <Route path="/dash/:ignore/popout.html" element={<div />} />
@@ -125,8 +200,9 @@ export default function App() {
               <Route path="/help/*" element={wrap(<HelpPage />)} />
               <Route path="/sqleditor" element={wrap(<RequireAuth><SqlEditorPage /></RequireAuth>, "sqleditor", "sqleditorpage")} />
               <Route path="/user" element={<RequireAuth>{wrap(<UserPage />)}</RequireAuth>} />
-              <Route path="/" element={wrap(<PageHome />, undefined, "homepage", true)} />
+              <Route path="/" element={wrap(<PageHome />, undefined, "homepage")} />
           </Routes>
+          </ScrollToTop>
           </AppPageContainer>
         </BrowserRouter>}
       
@@ -136,22 +212,32 @@ export default function App() {
 }
 
 
+const ScrollToTop = (props:any) => {
+  const location = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location]);
+
+  return <>{props.children}</>
+};
+
+
 function LogoutPage(props:{logoutCallBack:() => void}) {
   let navigate = useNavigate();
-  useEffect(() => {props.logoutCallBack(); navigate("/login", { replace: true }); })
+  useEffect(() => {props.logoutCallBack(); navigate("/rlogin", { replace: true }); })
   return <><h1>Logged Out</h1></>;
 }
 
 function RequireAuth({ children }: { children: JSX.Element }) {
-  let context = React.useContext(ThemeContext);
+  let context = useContext(ThemeContext);
   let location = useLocation();
 
   if (!context || !context.login) {
-    // Redirect them to the /login page, but save the current location they were
+    // Redirect them to the /rlogin page, but save the current location they were
     // trying to go to when they were redirected. This allows us to send them
     // along to that page after they login, which is a nicer user experience
     // than dropping them off on the home page.
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/rlogin" state={{ from: location }} replace />;
   }
 
   return children;
@@ -172,24 +258,36 @@ function AppPageContainer(props:{children:React.ReactNode}) {
   return <div className={"App" + (themeContext.theme === "dark" ? " bp4-dark Appdark" : "")} onKeyDown={handleKeyDown} onKeyUp={handleKeyUp}>{props.children}</div>;
 }
 
-export let isDEBUG = () => { return window.location.search.toLowerCase().indexOf("debugg") >= 0 };
-
 function PageHome() {
   useEffect(() => { document.title = ANAME }, []);
-  const context = useContext(ThemeContext);
 
   return (
     <div id="pageMain">
     <div id="darkContainer">
       <section className="home-top">
-        <div className="container">  
-          <div className="row">
-              <div className="col-md-12"></div>
+        <div className="container splashContainer">  
+          <div className="row toprow">
+              <div className="col col-md-12">
+              <h1><img src="./img/logo-white.png" alt="Pulse" /></h1>
+              <h2>Real-time visual analysis, email reporting and alerting</h2>
+                    <p>Create and share real-time interactive dashboards with your team.
+                    </p>
+              </div>
+          </div>
+        </div>
+        <div className="buttoncontainer">  
+          <div className="row buttonrow">
+            <div className="col">
+                <Link to="/dash"><Button icon="dashboard" intent="success" large>Dashboards</Button></Link>
+                {/* eslint-disable-next-line react/jsx-no-target-blank */}
+                <a href="https://www.timestored.com/pulse/vid" target="_blank"><Button icon="video" intent="success" large>Video Tour</Button></a>
+                <Link to="/help/chart/timeseries"><Button icon="help" intent="primary" large>Documentation</Button></Link>
+            </div>
           </div>
         </div>
       </section>
             
-      <section className="home-intro">
+      {/* <section className="home-intro">
         <div className="container">
           
           <div className="row">
@@ -204,13 +302,13 @@ function PageHome() {
               </div>
 
               <div className="col-md-8">
-                <img src={"/img/pulse-screenshot" + (context.theme === "dark" ? "" : "-dark") + ".png"} alt="Pulse Screenshot" width="695" height="383" />
+                <img src={"./img/pulse-screenshot" + (context.theme === "dark" ? "" : "-dark") + ".png"} alt="Pulse Screenshot" width="695" height="383" />
               </div>
 
           </div>
 
           </div>
-      </section>
+      </section> */}
 
       <section className="home-examples">
         <div className="container">  
@@ -225,12 +323,12 @@ function PageHome() {
             <div className="col-md-6">
                 <h2 id="qsyntax">Bloomberg like Price Grids</h2>
                 <p>Multiple time-series updating within milli-seconds</p>
-                <img src="/img/price-grid.png" alt="Data Grid" width="353" height="217" />
+                <img src="./img/price-grid.png" alt="Data Grid" width="353" height="217" />
             </div>
             <div className="col-md-6">
                 <h2>Trade Blotters</h2>
                 <p>Within a few clicks, you can create beautiful customized dashboards.</p>
-                <img src="/img/blotter2-small.png" alt="Trade Blotter" width="353" height="217" />
+                <img src="./img/blotter2-small.png" alt="Trade Blotter" width="353" height="217" />
             </div>
             
 
@@ -263,9 +361,7 @@ function PageHome() {
             <div className="col-md-4">
               <Icon icon="data-connection" size={48}/>
               <h2>Works with your data sources</h2>
-              <ul>
-                <li>kdb</li><li>postgresql</li><li>mysql</li><li>oracle</li>
-              </ul>
+              <p>kdb postgresql mysql oracle</p>
             </div>
             
             <div className="col-md-4">
@@ -288,50 +384,3 @@ function PageHome() {
     </div>);
 }
 
-
-function Footer(props:{largeFooter:boolean}) {
-
-  const large = <div className="row">
-      <div className="col-md-4">
-          <div className="widget-footer">
-              <h5>Products</h5>
-              <ul className="list-items">
-                  <li className="list-item"><a href="/qstudio">qStudio</a></li>
-                  <li className="list-item"><a href="http://www.sqldashboards.com">sqlDashboards</a></li>
-              </ul>
-          </div>
-      </div>
-      <div className="col-md-4">
-          <div className="widget-footer">
-              <h5>Learn</h5>
-              <ul className="list-items">
-                  <li className="list-item"><a href="/kdb-training">kdb+ Training</a></li>
-                  <li className="list-item"><a href="/kdb-guides">kdb+ Tutorials</a></li>
-                  <li className="list-item"><a href="/kdb-training/online">Online Course Login</a></li>
-                  <li className="list-item"><a href="/time-series-data">Time Series Data</a></li>
-              </ul>
-          </div>
-      </div>
-      <div className="col-md-4">
-          <div className="widget-footer">
-              <h5>Company</h5>
-              <ul className="list-items">
-                  <li className="list-item"><a href="/about">About TimeStored</a></li>
-                  <li className="list-item"><a href="/b">Blog & News</a></li>
-              </ul>
-          </div>
-      </div>
-  </div>;
-  const lg = props.largeFooter;
-  return   <footer id="site-footer" className="site-footer footer-v3 site-f7" style={{position:lg ? "inherit" : "fixed", marginTop:lg ? "50px" : "0"}}>
-      <div className="container-fluid px-xl-0">
-          {props.largeFooter ? large : null}
-          <div className="row" style={{borderTop:"1px solid #BBB", margin:"1px auto", padding:"1px 0" }}>
-              <div className="col-sm-6">{/* <div className="flogo-i6"><a href="/"><Logo /></a></div> */}</div>
-              <div className="col-md-6">
-                  <p className="copyright-text i7">Copyright © 2022 <strong>{ANAME}</strong>. All Rights Reserved.</p>
-              </div>
-          </div>
-      </div>
-    </footer>;
-}

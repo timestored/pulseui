@@ -111,6 +111,27 @@ export class ExampleTestCases {
       })();
 
 
+	  public static OHLC_TESTCASE:TestCase = (function() {
+        const DATES = "2024.03.17 2024.03.18 2024.03.19 2024.03.20 2024.03.21 2024.03.24 2024.03.25 2024.03.26 2024.03.27 2024.03.28 2024.03.31 2024.04.01 2024.04.02 2024.04.03 2024.04.04 2024.04.07 2024.04.08 2024.04.09 2024.04.10 2024.04.11 2024.04.14 2024.04.15 2024.04.16 2024.04.17 2024.04.18 2024.04.21 2024.04.22 2024.04.23 2024.04.24 2024.04.25".split(" ");
+        const VOL = [3,9,6,5,4,7,8,2,13,3,9,6,5,4,7,8,2,13,3,9,6,5,4,7,8,2,13,3,9,6];
+        const CLOSE = Array(30).fill(0).map((e, idx) => 55 + idx * 2);
+		const OPEN = Array(30).fill(0).map((e, idx) => 60 + idx);
+    
+		let ohlcvQuery = "{ c:55+2*til 30; ([] t:`$string raze 2024.03.17+(7*til 6)+\\:til 5; high:c+30; low:c-20; open:60+til 30; close:c; volume:30#3 9 6 5 4 7 8 2 13) }[]";
+		let colTitles = ["Date", "Open", "High", "Low", "Close", "Volume"];
+		let colValues = [DATES, OPEN, CLOSE.map(e => e+30), CLOSE.map(e => e - 20),  CLOSE, VOL];
+		let rs = getSmartRs(colTitles, colValues);
+		return ExampleTestCases.OHLC_TESTCASE = new TestCase(ohlcvQuery, "OHLC", rs);
+      })();
+
+	  public static CALENDAR_TESTCASE:TestCase = (function() {
+		const DATES = Array(365).fill(new Date()).map((e, idx) => { let d = new Date(); d.setDate(e.getDate() + idx); return d});
+        const VAL = Array(365).fill(0).map((e, idx) => 55 + idx * 2);
+    
+		let calendarQuery = "([] dt:2023.12.31 - til 730; v:(asc 730?50)+(730?50)+730#90 80 72 83 40 2 3)";
+		let rs = getSmartRs(["Date", "Val"], [DATES, VAL]);
+		return ExampleTestCases.CALENDAR_TESTCASE = new TestCase(calendarQuery, "OHLC", rs);
+      })();
     
 }
 

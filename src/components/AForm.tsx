@@ -1,19 +1,20 @@
 import { Button, ButtonGroup, Checkbox,   HTMLSelect,  HTMLTable, Icon, IconName, MaybeElement, MenuItem, NumericInput, Radio, RadioGroup, Slider, TextArea } from '@blueprintjs/core';
-import { DateInput, IDateFormatProps } from '@blueprintjs/datetime';
+import { DateInput2, DateRange, DateRangeInput2 } from '@blueprintjs/datetime2';
 import moment from 'moment';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Component } from 'react';
-import { MyInput, MyModal, WidgetProperties, MyUncontrolledInput, ErrorBoundary, MyHelpLink } from './CommonComponents';
+import { MyInput, MyModal, WidgetProperties, KeyParamInput, MyHelpLink, UncontrolledInput, getDefaultErrorFallback } from './CommonComponents';
 import { GrCheckboxSelected, GrRadialSelected,  GrSelection, GrSort } from 'react-icons/gr';
 import { ChartWrapper } from '../styledComponents';
-import { Queryable, UpdatingQueryable, UpdatingQueryableListener } from '../engine/queryEngine';
-import { AiOutlineConsoleSql } from "react-icons/ai";
-import { ItemPredicate, ItemRenderer, MultiSelect, Select } from '@blueprintjs/select';
+import { ArgType, Queryable, UpdatingQueryable, UpdatingQueryableListener } from '../engine/queryEngine';
+import { ItemPredicate, ItemRenderer, MultiSelect2, Select2 } from '@blueprintjs/select';
 import { BiSlider } from "react-icons/bi";
 import { SmartRs } from '../engine/chartResultSet';
 import { EmptySmartRs } from './../engine/chartResultSet';
-import { cloneDeep } from "lodash-es";
+import { cloneDeep, debounce } from "lodash-es";
 import { Enumify } from 'enumify';
+import { ErrorBoundary } from '../ErrorBoundary';
+import { FormEvent } from 'react';
 
 
 /**
@@ -32,9 +33,11 @@ class GooType extends Enumify  {
     static radio = new GooType("Radio Buttons", "Choose One:", <GrRadialSelected />);
     static checkbox = new GooType("Checkboxes", "Select:", <GrCheckboxSelected />);
     static datepicker = new GooType("Date Picker", "Date:", "calendar");
-    static aftext = new GooType("Text Box", "Enter Text:", "new-text-box");
+    static aftext = new GooType("Text Field", "Enter Text:", "text-highlight");
+    static textarea = new GooType("Text Area", "Enter Text:", "new-text-box");
     static slider = new GooType("Slider", "Select:", <BiSlider />);
-    static anumber = new GooType("Numeric Box", "Select:", "numerical");
+    static submit = new GooType("Submit", "Submit", <Icon icon="widget-button" />);
+    // static anumber = new GooType("Numeric Box", "Select:", "numerical");
     static _ = GooType.closeEnum();
     
     constructor(readonly nicename:string, readonly label:string, readonly icon:IconName | MaybeElement) {
@@ -42,8 +45,17 @@ class GooType extends Enumify  {
     }
   }
 
-type guiType = "drop"|"multi"|"radio"|"checkbox"|"slider"|"datepicker"|"aftext";
-type FormWidet = {
+type guiType = "drop"|"multi"|"radio"|"checkbox"|"slider"|"datepicker"|"submit"|"aftext"|"textarea";
+
+
+type storedConfig = {
+    datepickerAllowTimes?:boolean,
+    datepickerAllowRange?:boolean, 
+    sliderMin?:number,
+    sliderMax?:number,
+}
+
+type FormWidet = storedConfig & {
     id:number,
     guiType:guiType, 
     key:string, 
@@ -54,8 +66,6 @@ type FormWidet = {
     exception:string | undefined,
     useHardcoded:boolean, 
     allowUserCreatedEntries:boolean,
-    sliderMin:number,
-    sliderMax:number,
 };
 
 type guiTypeConfig = {
@@ -127,12 +137,12 @@ export default class AForm extends Component<WidgetProperties<AFormState>,AFormS
         this.state.formWidgets.forEach(fw => maxId = fw.id > maxId ? fw.id : maxId);
         maxId++;
         let uQueryable = new UpdatingQueryable(this.props.serverConfigs, this.props.queryEngine, this.getUpdateStateListener(maxId));
-        const key = (ftype === "datepicker" ? "myDate" : (ftype === "slider" ? "myNumber" : "key")) + maxId;
+        const key = (ftype === "datepicker" ? "myDate" : (ftype === "slider" ? "myNumber" : (ftype === "submit" ? "submit_" : "key"))) + maxId;
         const optionsList = ["nyc|New York|United States","ldn|London|United Kingdom","washington|Washington, D.C.|United States","beijing|Beijing|China","delhi|New Delhi|India"];
         return {id:maxId, 
             guiType:ftype, key, label:typeConfig.label, optionsList, 
             uQueryable, useHardcoded:true, srs:EmptySmartRs, exception:undefined,
-            allowUserCreatedEntries:false, sliderMin:0, sliderMax:100};
+            allowUserCreatedEntries:false, sliderMin:0, sliderMax:100, datepickerAllowRange:false, datepickerAllowTimes:false};
     }
 
     canMove = (direction:number, selIdx:number | undefined)  => { 
@@ -196,62 +206,72 @@ export default class AForm extends Component<WidgetProperties<AFormState>,AFormS
             case "radio": return ARadio;
             case "checkbox": return ACheckbox;
             case "slider": return ASlider;
+            case "submit": return ASubmit;
             case "datepicker": return ADateInput;
             case "aftext": return ATextInput;
+            case "textarea": return ATextAreaInput;
             default: return ADateInput;
         }
     }
     
     factory(formWidget:FormWidet) {
-        let argLookup = this.props.queryEngine.argMap[formWidget.key];
+        let args = this.props.queryEngine.argMap[formWidget.key];
         let options = Array<IOptionRow>();
         if(formWidget.useHardcoded) {
             options = formWidget.optionsList ? toOptionRows(formWidget.optionsList) : [];
         } else {
             options = toOptionRowsFromRs(formWidget.srs);
         }
+        const guiTypeToArgType = (guiType:guiType):ArgType => {
+            return guiType === "slider" ? "number" : (guiType === "drop" || guiType === "radio" || guiType === "aftext"|| guiType === "textarea") ? "string" : guiType === "datepicker" ? "date" : "strings";
+        }
         // If the widget only allows one choice, choose any option to allow displaying something
         let oneChoiceWidget = formWidget.guiType === "radio" || formWidget.guiType === "drop";
-        if(oneChoiceWidget && argLookup === undefined && options.length>0) {
-            this.props.queryEngine.setArg(formWidget.key, [options[0].val]);
+        if(oneChoiceWidget && args === undefined && options.length>0) {
+            this.props.queryEngine.setArg(formWidget.key, [options[0].val], guiTypeToArgType(formWidget.guiType));
         }
 
         let props = { 
             onArgSelected:(e:string[])=>{
-                this.props.queryEngine.setArg(formWidget.key, e);
+                this.props.queryEngine.setArg(formWidget.key, e, guiTypeToArgType(formWidget.guiType));
             },
+            args,
             options,
-            selectedArgs:argLookup ? options.filter(oRow => argLookup.indexOf(oRow.val) !== -1) : [],
+            selectedArgs:args ? options.filter(oRow => args.indexOf(oRow.val) !== -1) : [],
+            // passing subset as don't want to expose all??
             allowUserCreatedEntries:formWidget.allowUserCreatedEntries,
+            label:formWidget.label,
+            datepickerAllowRange:formWidget.datepickerAllowRange,
+            datepickerAllowTimes:formWidget.datepickerAllowTimes,
+            sliderMin:formWidget.sliderMin,
+            sliderMax:formWidget.sliderMax,
         };
-        // Hacky way of converting sliderOptions to IOptionRow format
-        if(formWidget.guiType === "slider") {
-            const max = formWidget.sliderMax > formWidget.sliderMin ? formWidget.sliderMax : formWidget.sliderMin + 1;
-            props.options = [{val:""+formWidget.sliderMin},{val:""+max}];
-        }
-        return <div><label>{formWidget.label}</label>{React.createElement(this.gett(formWidget), props)}</div>;
+        const showLabel = formWidget.label.length > 0 && formWidget.guiType !== "submit";
+        return <>{showLabel ? <label>{formWidget.label}</label> : null}{React.createElement(this.gett(formWidget), props)}</>;
     }
 
     // FormTypeSelect = (props:{jdbcTypeSelected?:string, onChange:(e:React.FormEvent<HTMLSelectElement>)=>void}) => {
     FormTypeSelect = (props:{selected:guiType, onChange:(e:guiType)=>void}) => {
+        let myGooType = (GooType.enumValueOf(props.selected) as GooType);
         return <div>
-        <span style={{padding:2}}><Icon icon={(GooType.enumValueOf(props.selected) as GooType).icon} /></span>
-        <HTMLSelect onChangeCapture={(e)=>{props.onChange(e.currentTarget.value as guiType)}} >
-            {GooType.enumValues.map(e => <option value={e.enumKey} selected={e.enumKey === props.selected}>{(GooType.enumValueOf(e.enumKey) as GooType).nicename}</option>)}
-        </HTMLSelect></div>;
+        {/*  */}
+            {props.selected === "submit" ?
+                <span style={{padding:2}}><Icon icon={myGooType.icon} /> {myGooType.nicename} </span>
+                : <HTMLSelect onChangeCapture={(e)=>{props.onChange(e.currentTarget.value as guiType)}} >
+                    {GooType.enumValues.filter(e => e.enumKey !== "submit").map(e => <option value={e.enumKey} key={e.enumKey} selected={e.enumKey === props.selected}>{(GooType.enumValueOf(e.enumKey) as GooType).nicename}</option>)}
+                    </HTMLSelect>}
+        </div>;
     }
 
     render() {  
         const {selectedIndex,formWidgets,layout } = this.state;
         const selectedFW = selectedIndex === undefined ? undefined : formWidgets[selectedIndex];
 
-        return (<ChartWrapper><div className="aform">
+        return (<ChartWrapper><div className={"aform aform" + (this.state.layout === "Horizontal" ? "Horizontal" : "Vert")}>
             {formWidgets.length > 0 ?
                 formWidgets.map((fw,idx) => 
-                    <div key={idx} style={{display:layout === "Horizontal" ? "inline-block" : "block"}}>
-                        <span onClick={() => this.setState({selectedIndex:idx})}>
-                            <ErrorBoundary>{this.factory(fw)}</ErrorBoundary>
-                        </span>
+                    <div onClick={() => this.setState({selectedIndex:idx})} key={idx} className={"aformRow aformRow"+ (layout === "Horizontal" ? "Horizontal" : "Vert")} >
+                        <ErrorBoundary FallbackComponent={getDefaultErrorFallback("Error rendering form")}>{this.factory(fw)}</ErrorBoundary>
                     </div>)
                 : <div style={{margin:10}}>
                     <p>Forms allow user interaction. Forms provide users options either from hardcoded lists or from SQL queries.
@@ -262,41 +282,44 @@ export default class AForm extends Component<WidgetProperties<AFormState>,AFormS
 
                   </div>}
 
-        {this.props.selected && <MyModal title="AformEditor" handleClose={this.props.clearSelected}>
-            <fieldset key="FormComponents" style={{width:"45%",maxWidth:"45%",  float:"left"}}>
+        {this.props.selected && <MyModal title="Form Editor" handleClose={this.props.clearSelected} className="formMyModal">
+            <div className='formMyModalContainer'>
+            <fieldset key="FormComponents" className='FormComponents'>
             <legend>Form Components:</legend>
+            <RadioGroup label="Layout:"  inline onChange={e => {this.setState({layout:e.currentTarget.value === "Vertical" ? "Vertical" : "Horizontal"})} } 
+                selectedValue={layout}>
+                <Radio inline value="Vertical" label='Vertical' /><Radio inline value="Horizontal" label="Horizontal" />
+            </RadioGroup>
             <HTMLTable bordered condensed>
                 <thead>
-                <tr><th>Label</th><th>Type</th><th>key</th> 
-                <td><Button icon="arrow-up" minimal disabled/></td>
-                <td><Button icon="arrow-down" minimal disabled/></td>
-                <td><Button icon="delete" minimal disabled/></td></tr>
+                <tr><th>Label</th><th>Type</th><th>key</th><th colSpan={3}></th></tr>
                 </thead>
                 <tbody>
                 {this.state.formWidgets.map((fw, i) => 
-                    <tr onClick={() => { this.setState({selectedIndex:i})}}>
+                    <tr key={fw.key} onClick={() => { this.setState({selectedIndex:i})}}>
                     <td><MyInput label="" value={fw.label} name="myLabel" onChange={(e) => this.modify(i, {label:e.currentTarget.value})}/></td>
                     <td>
                         <this.FormTypeSelect selected={fw.guiType} onChange={(gt)=>this.modify(i, {guiType:gt})} />
                     </td>
-                    <td><MyUncontrolledInput label="" value={fw.key} name="myKey" onComplete={(s) => this.modify(i, {key:s})}/></td>
-                    <td><Button icon="arrow-up" minimal disabled={!this.canMove(-1, i)} onClick={() => this.move(-1, i)} intent="success"/></td>
-                    <td><Button icon="arrow-down" minimal disabled={!this.canMove(1, i)} onClick={() => this.move(1, i)} intent="success"/></td>
-                    <td><Button icon="delete" intent="danger" minimal onClick={() => this.delete(i)}/></td>
+                    <td><KeyParamInput label="" value={fw.key} name="myKey" onComplete={(s) => this.modify(i, {key:s})} forcedPrefix={fw.guiType === "submit" ? "submit_" : ""}/></td>
+                    <td><Button icon="arrow-up" minimal disabled={!this.canMove(-1, i)} onClick={() => this.move(-1, i)} intent="success" title="Move input up the form." /></td>
+                    <td><Button icon="arrow-down" minimal disabled={!this.canMove(1, i)} onClick={() => this.move(1, i)} intent="success" title="Move input down the form." /></td>
+                    <td><Button icon="delete" intent="danger" minimal onClick={() => this.delete(i)} title="Remove this input."/></td>
                 </tr>)}
-                <tr><td colSpan={6}>
+                <tr id="editor2-footer-controls" key="my-footer-row"><td colSpan={6}>
                 <Button icon="add" onClick={() => this.addFW("drop")} intent="success" minimal/><label>Add Component: </label>
-                    <ButtonGroup minimal>
-                        {(["drop", "multi", "radio", "checkbox", "datepicker", "aftext", "slider", "anumber"] as Array<guiType>)
-                            .map(e => <Button icon={getConfig(e).icon} onClick={() => this.addFW(e)} />)}
+                    <ButtonGroup minimal id='editor2-footer-addbuttons'>
+                        {(["drop", "multi", "radio", "checkbox", "aftext", "textarea", "datepicker", "slider", "submit"] as Array<guiType>)
+                            .map(e => <Button key={e} title={(GooType.enumValueOf(e) as GooType).nicename} icon={getConfig(e).icon} onClick={() => this.addFW(e)} />)}
                     </ButtonGroup>
                 </td></tr>
                 </tbody>
             </HTMLTable>
             </fieldset>
             {/* The onComplete callback has to specify the index, incase the selection changes */}
-            {selectedFW && selectedIndex !== undefined && selectedFW.guiType !== "datepicker" &&
+            {selectedFW && selectedIndex !== undefined && selectedFW.guiType !== "submit" &&
             <AFormComponentEditor selectedFW={selectedFW} modify={(formWidgetUpdate) => { this.modify(selectedIndex, formWidgetUpdate)}} />}
+        </div>
         </MyModal>}
       </div></ChartWrapper>)
     }
@@ -311,38 +334,74 @@ const AFormComponentEditor = (props:{selectedFW:FormWidet, modify:(formWidgetUpd
                         + "<br/>nyc|New York|America"
                         + "<br/>ldn|London|United Kingdom"
                         + "<br/>atl|Atlanta International Airport|USA</p>";
+    const sqlToolTip = "<p>Your SQL query can return between 1-3 columns. Column mappings:"
+                        + "<ol><li>1st Column - Value sent to database when selected</li>"
+                        + "<br/><li>2nd Column - Nice string diplayed to user</li>"
+                        + "<br/><li>3rd Column - Tooltip/Title shown as additional info to user where possible</li></ol>"
+                        + "<br/></p>";
     const {selectedFW, modify } = props;
-    const isNumeric = selectedFW && (selectedFW.guiType === "slider");
-    const isRecordBased = selectedFW && !(selectedFW.guiType === "slider" || selectedFW.guiType === "datepicker");
+    const { guiType, useHardcoded, uQueryable, sliderMin, sliderMax } = selectedFW;
+    const isNumeric = selectedFW && (guiType === "slider");
+    const isRecordBased = selectedFW && !(guiType === "slider" || guiType === "datepicker" || guiType === "aftext" || guiType === "textarea");
 
-    return <fieldset style={{width:"45%", float:"left"}} key="ComponentEditor">
+    return <fieldset className="ComponentEditor" key="ComponentEditor">
     <legend>Component Editor</legend>
-    <div>
-        {isRecordBased && <span><label>Type: </label><Button icon={selectedFW.useHardcoded ? "numbered-list" : <AiOutlineConsoleSql />} intent="primary" onClick={() => modify({useHardcoded:!selectedFW.useHardcoded})}>
-                    {selectedFW.useHardcoded ? "List" : "SQL"}
-                    </Button>| </span>}
-                    <MyHelpLink href="/help/forms" htmlTxt={selectedFW.useHardcoded ? hardcodedTooltip : "SQLbab"} />
-        {(selectedFW.guiType === "drop") &&
-            <Checkbox checked={selectedFW.allowUserCreatedEntries} inline
-                onChange={()=>modify({allowUserCreatedEntries:!selectedFW.allowUserCreatedEntries})}>
-                <span>Allow user to create new entries</span></Checkbox>}
+    <div className='AFormComponentEditor'>
+        {isRecordBased && <span>
+            <RadioGroup label="Data Source:" inline selectedValue={useHardcoded ? "List" : "SQL"}
+                onChange={(event:FormEvent<HTMLInputElement>) => {
+                    modify({useHardcoded:event.currentTarget.value === "List" ? true : false})
+                    }}>
+                <Radio label="List" value="List" />
+                <Radio label="SQL" value="SQL" />
+            </RadioGroup>
+            {/* <Button icon={useHardcoded ? "numbered-list" : <AiOutlineConsoleSql />} rightIcon="caret-down" 
+                    onClick={() => modify({useHardcoded:!useHardcoded})}>{useHardcoded ? "List" : "SQL"}</Button>|  */}
+            </span>}
+            <MyHelpLink href="/help/forms" htmlTxt={useHardcoded ? hardcodedTooltip : sqlToolTip} />
+        {/* {(guiType === "drop") &&
+            <Checkbox checked={allowUserCreatedEntries} inline
+                onChange={()=>modify({allowUserCreatedEntries:!allowUserCreatedEntries})}>
+                <span>Allow user to create new entries</span></Checkbox>} */}
         {isRecordBased && 
-            (selectedFW.useHardcoded ? 
-            <div><span>value|nice name|description</span>
+            (useHardcoded ? 
+            <div className="hardcodedQueryEditor"><span>value|nice name|description</span>
             <TextArea growVertically={true} large={true}  fill
                 onChange={(e) => modify({optionsList:e.currentTarget.value.split("\n")})} 
                 value={selectedFW.optionsList?.join("\n")} /></div>
-            : <div className="smallQueryableEditor">{selectedFW.uQueryable?.getEditor(null)}</div>)}
+            : <div className="smallQueryableEditor">{uQueryable?.getEditor(null)}</div>)}
         {isNumeric && <div>
             <label>Min:</label>
-            <NumericInput selectAllOnFocus allowNumericCharactersOnly onValueChange={(n,s) => { modify({sliderMin:n}) }} value={selectedFW.sliderMin} />
+            <NumericInput allowNumericCharactersOnly max={sliderMax} 
+                    onValueChange={(n,s) => { if(n <= (sliderMax || 0)) { modify({sliderMin:n}) }}} defaultValue={sliderMin} />
             <label>Max:</label>
-            <NumericInput selectAllOnFocus allowNumericCharactersOnly onValueChange={(n,s) => { modify({sliderMax:n}) }} value={selectedFW.sliderMax} />
+            <NumericInput allowNumericCharactersOnly min={sliderMin} 
+                    onValueChange={(n,s) => { if(n >= (sliderMin || 0)) { modify({sliderMax:n}) }}} defaultValue={sliderMax} />
         </div>}
+        {guiType === "datepicker" && 
+            <DatePickerConfigUI onChange={dpc => modify({datepickerAllowTimes:dpc.allowTimes, datepickerAllowRange:dpc.allowRange})}
+                allowRange={selectedFW.datepickerAllowRange || false} allowTimes={selectedFW.datepickerAllowTimes || false} />}
     </div>
     </fieldset>;
 }
 
+type DatePickerConfig = {allowRange:boolean, allowTimes:boolean};
+function DatePickerConfigUI(props:DatePickerConfig & {onChange:((chg:DatePickerConfig) => void)}) {
+    const datepickRTVal = (props.allowRange ? "1" : "0") + (props.allowTimes ? "1" : "0");
+    const handleRTval = (rt:string) => {
+        props.onChange({allowRange:rt[0] === "1", allowTimes:rt[1] === "1"});
+    };
+
+    return  <div className="datePickerConfig">
+        <RadioGroup label="Type" onChange={e => handleRTval(e.currentTarget.value)} selectedValue={datepickRTVal} >
+            <Radio label="[2025-01-01]              - Single Date" value="00" />
+            <Radio label="[2025-01-01T13:00]        - Single DateTime " value="01" />
+            <Radio label="[2025-01-01] [2025-01-01] - Date Range" value="10" />
+            <Radio label="[2025-01-01T13:00] [2025-01-02T14:00] - DateTime Range" value="11" />
+        </RadioGroup>
+    </div>;
+
+}
 
 /******************   The separate types of FormWidgets are below here ***************************/
 
@@ -352,7 +411,13 @@ export interface IOptionRow {
     label?:string,
 }
 
-export type ASelectCallback = {  options:IOptionRow[], onArgSelected:(v:string[])=>void, selectedArgs:IOptionRow[] }
+type ASelectCallback = storedConfig & {  
+    options:IOptionRow[], 
+    onArgSelected:(v:string[])=>void, 
+    args?:string[], 
+    selectedArgs:IOptionRow[], 
+    className?:string, 
+}
 
 const ARadio = (props:ASelectCallback) => {
     const { onArgSelected, options, selectedArgs } = props;
@@ -366,8 +431,6 @@ const ARadio = (props:ASelectCallback) => {
     
 const ACheckbox = (props:ASelectCallback) => {
     const { onArgSelected, options, selectedArgs } = props;
-    console.log("checkBoxOptions");
-    console.log(options);
     return (<div className="checkboxForm">
         {options.map(oRow => {
             return <Checkbox
@@ -378,30 +441,24 @@ const ACheckbox = (props:ASelectCallback) => {
     </div>);
 }
 
-function getMinMaxVal(props:ASelectCallback):{min:number| undefined, max:number | undefined, value:number | undefined, labelStepSize:number | undefined} {
-    const {options, selectedArgs} = props;
-    const value = selectedArgs?.length > 0 ? parseFloat(selectedArgs[0].val) : undefined;
-    let min = undefined;
-    let max = undefined;
-    let labelStepSize = undefined;
-    if(options.length === 1) {
-        min = 0;
-        max = parseFloat(options[0].val);
-        labelStepSize = max/20;
-    } else if(options.length >= 2) {
-        min = parseFloat(options[0].val);
-        max = parseFloat(options[1].val);
-        labelStepSize = (max-min)/20;
-    }
-    return {min,max,value,labelStepSize};
-}
-
 const ASlider = (props:ASelectCallback) => {
-    const { min, max, value, labelStepSize } = getMinMaxVal(props);
+    let stepSize = Math.floor(props.sliderMax !== undefined ? (props.sliderMin !== undefined ? (props.sliderMax - props.sliderMin)/20 : props.sliderMax/20) : 0);
+    let sz = stepSize === 0 ? undefined : stepSize
+    console.log("stepSize=" + sz);
+    const value = (props.args && props.args.length>0) ? parseFloat(props.args[0]) : 0;
     const [val,setValue] = useState(value);
-    return (<div style={{width:"90%"}}><Slider onRelease={n => props.onArgSelected([""+n])} onChange={setValue} {...{min,max,value:val,labelStepSize}} /></div>);
+    return (<div style={{width:"90%"}}>
+            <Slider onRelease={n => props.onArgSelected([""+n])} onChange={setValue} min={props.sliderMin} max={props.sliderMax} value={val} 
+                stepSize={sz} labelStepSize={sz} />
+        </div>);
 }
     
+const ASubmit = (props:{label?:string} &ASelectCallback) => {
+    const [val,setValue] = useState(0);
+    return (<div style={{width:"90%"}}><Button onClick={e => { props.onArgSelected([""+val]); setValue(val+1); }} value={"Submit"} >{props.label ?? "Submit"}</Button></div>);
+}
+    
+
 function toOptionRows(optionsList:string[]):Array<IOptionRow> {
     return optionsList.map(s => {
         let a = s.split("|");
@@ -424,7 +481,7 @@ const filterOptionRow: ItemPredicate<IOptionRow> = (query, optionRow) => {
 
 export const ASelectSingle = (props:{allowUserCreatedEntries?:boolean} & ASelectCallback) => {
     const { onArgSelected, options } = props;
-    const OptionRowSelect = Select.ofType<IOptionRow>();
+    const OptionRowSelect = Select2.ofType<IOptionRow>();
     // const OptionRowSuggest = Suggest.ofType<IOptionRow>();
     const sArgs = props.selectedArgs;
     const renderOptionRow: ItemRenderer<IOptionRow> = ( optionRow, { handleClick, modifiers, query }) => {
@@ -445,8 +502,8 @@ export const ASelectSingle = (props:{allowUserCreatedEntries?:boolean} & ASelect
     //         closeOnSelect>
     //         <Button text={txt} rightIcon="caret-down" />
     //         </OptionRowSuggest>
-        return (<OptionRowSelect {...commonProps} filterable={options.length>10}  >
-        <Button text={txt} rightIcon="caret-down" />
+        return (<OptionRowSelect {...commonProps} filterable={options.length>10} className={props.className} >
+        <Button small text={txt} rightIcon="caret-down" />
         </OptionRowSelect>);
 }
 
@@ -460,7 +517,7 @@ function toggle(sArgs:IOptionRow[], row:IOptionRow, onArgSelected:(v:string[])=>
 
 const ASelectMulti = (props:ASelectCallback) => {
     const { onArgSelected, options } = props;
-    const OptionRowMultiSelect = MultiSelect.ofType<IOptionRow>();
+    const OptionRowMultiSelect = MultiSelect2.ofType<IOptionRow>();
     const sArgs = props.selectedArgs;
     const handleTagRemove = (e:React.ReactNode, idx:number) => {
         if(e) {
@@ -486,22 +543,65 @@ const ASelectMulti = (props:ASelectCallback) => {
             selectedItems={sArgs} />);
 }
     
-
 const ATextInput = (props:ASelectCallback) => {
-    const [text,setText] = useState(props.selectedArgs ? props.selectedArgs[0].val : "");
-    return <MyInput label="" value={text} name="name" onChange={(e) => setText(e.currentTarget.value)} />;
+    const [text] = useState(props.args ? props.args[0] : "");
+    return <UncontrolledInput label="" value={text} name="name" onComplete={(s) => props.onArgSelected([s])} />;
 }
 
+const ATextAreaInput = (props:ASelectCallback) => {
+    const [text] = useState(props.args ? props.args[0] : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const reportComplete = useCallback(debounce((val:string) => props.onArgSelected([val]), 2000), [props.onArgSelected]);
+    return <TextArea defaultValue={text} onChange={e => reportComplete(e.target.value)} onBlur={e => props.onArgSelected([e.target.value])}
+                name="name" large={true}  fill rows={5} />;
+}
+
+
 const ADateInput = (props:ASelectCallback) => {
-    function getMomentFormatter(format: string): IDateFormatProps {
-        return {
-            formatDate: (date, locale) => moment(date).format(format),
-            parseDate: (str, locale) => moment(str, format).toDate(),
-            placeholder: format
+    const allowTimes = props.datepickerAllowTimes;
+    const format = allowTimes ? "YYYY-MM-DDTHH:mm:ss" : "YYYY-MM-DD";
+    const formatDate =  (date: Date, locale: string | undefined = undefined) =>  moment(date).format(format);
+    const parseDate  = (str: string, locale: string | undefined = undefined) => moment(str, format).toDate();
+    const allowRange = props.datepickerAllowRange;
+
+    const now = new Date();
+    let defaultValue = allowTimes ? now.toISOString() : toISO(now);
+    if(props.args && props.args.length>0) {
+        defaultValue = props.args[0];
+    } else if(!allowRange) {
+        props.onArgSelected([defaultValue]);
+    }
+    let defaultRange:DateRange = allowTimes ? [new Date(now.valueOf() - (5*60*1000)),now] : [now,now]; 
+    if(props.args && props.args.length>1) {
+        defaultRange =  [parseDate(props.args[0]), parseDate(props.args[1])];
+    } else if(allowRange) {
+        props.onArgSelected([formatDate(defaultRange[0]!),formatDate(defaultRange[1]!)]);
+    }
+
+    
+    
+    if(allowRange) {
+        const handleChange = (dateRange:DateRange) => {
+             if(dateRange != null && dateRange[0] != null && dateRange[1] != null) { 
+                const f = (d:Date) => moment(d).format(format);
+                props.onArgSelected([f(dateRange[0]),f(dateRange[1])]);
+            } 
         }
-    };
-    return (<DateInput fill={false} { ...getMomentFormatter("YYYY-MM-DD") } 
-        onChange={(date) => { if(date !== null) { props.onArgSelected([toISO(date)]); } }}/>); 
+        return <DateRangeInput2 allowSingleDayRange shortcuts={false} singleMonthOnly formatDate={formatDate} parseDate={parseDate}  highlightCurrentDay  
+                onChange={handleChange} defaultValue={defaultRange}  className={allowTimes ? "datePicker" : "dateTimePicker" }
+                closeOnSelection={!allowTimes} timePickerProps={allowTimes ? { showArrowButtons:true } : undefined} />
+    } else {
+        const handleChange = (date:string | null) => {
+            if(date !== null) {  // 2022-09-08T01:00+01:00
+                props.onArgSelected([date.indexOf("+") !== -1 ? date.substring(0,date.indexOf("+")) : date]); 
+            } 
+       }
+        return <DateInput2  fill={false} canClearSelection={false} defaultValue={defaultValue} formatDate={formatDate} parseDate={parseDate} showTimezoneSelect={false} 
+            closeOnSelection={!allowTimes} shortcuts={!allowTimes}  timePickerProps={allowTimes ? { showArrowButtons:true } : undefined}
+            rightElement={<Icon  icon="calendar" />}className={allowTimes ? "dateRangePicker" : "dateTimeRangePicker" }
+            timePrecision={allowTimes ? "minute" : undefined} onChange={handleChange}/>; 
+    }
+        
 }
 
 function toISO(date:Date):string {

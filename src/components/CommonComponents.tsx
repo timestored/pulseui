@@ -1,6 +1,6 @@
-import { Button, Card, Classes, Drawer, DrawerSize, Elevation, FormGroup, H3, Icon, InputGroup, Intent, Menu, MenuItem, Overlay } from "@blueprintjs/core";
-import { Alignment, Navbar, NavbarDivider, NavbarGroup, NavbarHeading } from '@blueprintjs/core';
-import React, { Component, ErrorInfo, FunctionComponent, ReactNode, SyntheticEvent, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { Button, Card, Classes, Elevation, FormGroup, H3, Icon, InputGroup, Intent, Menu, MenuItem, NonIdealState, Overlay } from "@blueprintjs/core";
+import { Alignment, Navbar, NavbarGroup, NavbarHeading } from '@blueprintjs/core';
+import React, { Component, FunctionComponent, ReactNode, SyntheticEvent, useCallback, useContext, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import _uniqueId from 'lodash-es/uniqueId';
 import { debounce } from "lodash-es";
@@ -11,6 +11,7 @@ import ReactTooltip from "react-tooltip";
 import { isAdmin, ThemeContext } from './../context';
 import { Popover2 } from "@blueprintjs/popover2";
 import { Logo } from "../App";
+import { FallbackProps } from "../ErrorBoundary";
 
 
 
@@ -25,19 +26,19 @@ export const MyNavBar: FunctionComponent<{ rightChildren?: React.ReactNode, chil
       <div id="myNavBar">
       <Navbar className={"topNavBar" + (context.theme === "dark" ? " " : " ")} >
         <NavbarGroup align={Alignment.LEFT} className="leftNavbarGroup">
-          <Link to="/"><NavbarHeading><Logo light/></NavbarHeading></Link>
-          <NavbarDivider />
+          <Link to="/dash"><NavbarHeading><Logo /></NavbarHeading></Link>
           <Link to="/dash"><Button icon="dashboard" text="Dashboards" minimal={true} intent={isSel("dashboard")} title="Dashboards" /></Link>
           <Link to="/sqleditor"><Button icon="database" minimal={true} text="SQL Editor" intent={isSel("sqleditor")} title="SQL Editor" /></Link>
           {isAdmin(context) && <Link to="/connections"><Button icon="globe-network" minimal={true} text="Connections" intent={isSel("connections")} title="Connections" /></Link>}
-          <NavbarDivider />
+          
           {children}
         </NavbarGroup>
-        <NavbarGroup align={Alignment.RIGHT}>
+        <NavbarGroup align={Alignment.RIGHT} className="rightNavBar">
           {rightChildren}
           <UserButton isAdmin={isAdmin(context)} username={context.login?.username} />
-          <Button icon="notifications" minimal title="You have no new notifications" />
-          <Link to="/help"><Button icon="help" intent={isSel("help")} minimal /></Link>
+          {/* <Button icon="notifications" minimal title="You have no new notifications" /> */}
+          {/* eslint-disable-next-line react/jsx-no-target-blank */}
+          <a href="http://timestored.com/pulse/help/?utm_source=pulse&utm_medium=app&utm_campaign=pulse" target="_blank"><Button icon="help" intent={isSel("help")} minimal /></a>
         </NavbarGroup>
       </Navbar>
       </div>);
@@ -52,13 +53,13 @@ function UserButton(props:{username:string | undefined, isAdmin:boolean}) {
       return <Popover2 isOpen={menuShown} placement="bottom" onInteraction={(state)=>setMenuShown(state)}  
           content={
           <Menu>
-            <Link to="/logout"><MenuItem icon="log-out"  text="Log out" /> </Link>
+            <Link to="/rlogout"><MenuItem icon="log-out"  text="Log out" /> </Link>
             {props.isAdmin && <Link to="/user"><MenuItem icon="user"  text="Users" /></Link>}
           </Menu>}>
           <Button icon="user" minimal onClick={()=>setMenuShown(true)}>{props.username}</Button>
         </Popover2>;
   }
-  return <Link to="/login"><Button icon="log-in" minimal>Login</Button></Link>;
+  return <Link to="/rlogin"><Button icon="log-in" minimal>Login</Button></Link>;
 }
 
 
@@ -98,17 +99,55 @@ class Modal extends Component<{ children: React.ReactNode }> {
   }
 }
 
+
+export function addParameter(url:string, parameterName:string, parameterValue:string, atStart:boolean = false):string {
+  let replaceDuplicates = true;
+let urlhash = '';
+let cl = url.length;
+  if(url.indexOf('#') > 0) {
+      cl = url.indexOf('#');
+      urlhash = url.substring(url.indexOf('#'),url.length);
+  }
+  let sourceUrl = url.substring(0,cl);
+
+  var urlParts = sourceUrl.split("?");
+  var newQueryString = "";
+
+  if (urlParts.length > 1) {
+      var parameters = urlParts[1].split("&");
+      for (var i=0; (i < parameters.length); i++) {
+          var parameterParts = parameters[i].split("=");
+          if (!(replaceDuplicates && parameterParts[0] === parameterName)) {
+      newQueryString = newQueryString === "" ? "?" : newQueryString+"&";
+              newQueryString += parameterParts[0] + "=" + (parameterParts[1]?parameterParts[1]:'');
+          }
+      }
+  }
+  if (newQueryString === "")
+      newQueryString = "?";
+
+  if(atStart){
+      newQueryString = '?'+ parameterName + "=" + parameterValue + (newQueryString.length>1?'&'+newQueryString.substring(1):'');
+  } else {
+      if (newQueryString !== "" && newQueryString !== '?')
+          newQueryString += "&";
+      newQueryString += parameterName + "=" + (parameterValue?encodeURIComponent(parameterValue):'');
+  }
+  return urlParts[0] + newQueryString + urlhash;
+};
+
+
 MyModal.defaultProps = {
   isOpen: true,
   title: ""
 };
-export function MyModal(props: { isOpen?: boolean, handleClose: () => void, title?: string, children?: React.ReactNode }) {
+export function MyModal(props: { className?:string, isOpen?: boolean, handleClose: () => void, title?: string, children?: React.ReactNode }) {
   // Letting it bubble up, would cause the widget to become selected again.
   const doClose = (event: SyntheticEvent<HTMLElement, Event>) => { props.handleClose(); event.stopPropagation(); }
   return <>
     <Modal>
-      <div className="mydrawer">
-        <h2><Button icon="arrow-left" minimal onClick={doClose} />&nbsp;{props.title}
+      <div className={"mydrawer " + (props.className || "") }>
+        <h2><Button icon="arrow-right" minimal small onClick={doClose} />&nbsp;{props.title}
           <Button className="drawerClose" intent="danger" icon="cross" minimal onClick={doClose} />
         </h2>
         <div className="drawerFormWrapper">
@@ -119,44 +158,14 @@ export function MyModal(props: { isOpen?: boolean, handleClose: () => void, titl
   </>
 }
 
-export function MyDrawer(props: { isOpen: boolean, handleClose: () => void, title: string, children?: React.ReactNode }) {
-  // Letting it bubble up, would cause the widget to become selected again.
-  const doClose = (event: SyntheticEvent<HTMLElement, Event>) => { props.handleClose(); event.stopPropagation(); }
 
-  return <>
-    <Drawer position="bottom" size={DrawerSize.STANDARD} canEscapeKeyClose
-      canOutsideClickClose hasBackdrop={false} isOpen={props.isOpen} onClose={doClose}>
-      <div className="mydrawer">
-        <h2><Button icon="arrow-left" minimal onClick={props.handleClose} />&nbsp;{props.title}
-          <Button className="drawerClose" intent="danger" icon="cross" minimal onClick={props.handleClose} />
-        </h2>
-        <div className="drawerForm">{props.children} </div>
-      </div>
-    </Drawer>
-  </>
-}
-
-interface ErState {
-  hasError: boolean;
-}
-
-export class ErrorBoundary extends Component<{ children: ReactNode | null, message?: ReactNode }, ErState> {
-  public state: ErState = { hasError: false };
-
-  public static getDerivedStateFromError(_: Error): ErState {
-    return { hasError: true };
-  }
-
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Uncaught error:", error, errorInfo);
-  }
-
-  public render() {
-    if (this.state.hasError) {
-      return this.props.message ?? <h1>Sorry.. there was an error</h1>;
-    }
-    return this.props.children;
-  }
+export function getDefaultErrorFallback(message:ReactNode | string | undefined = undefined):React.ComponentType<FallbackProps> {
+  return ({error, resetErrorBoundary}:FallbackProps) => (
+          <NonIdealState icon="error" title="Render Error">
+            {message === undefined ? <h1>Sorry.. there was an error</h1> : ((typeof message === "string") ? <h1>{message}</h1> : message)}
+            <Button onClick={resetErrorBoundary} icon="reset">Try again</Button>
+          </NonIdealState>
+      );
 }
 
 type sitepage = "/help/forms" | "/help" | "/help/chart";
@@ -192,22 +201,31 @@ export function MyInput(props: MyInputTypes) {
  * Displays an input text box , triggers only when complete. i.e. When blurred or enter pressed. 
  * This is very useful to prevent constant updating of fields that would be costly. e.g. Modifying the SQL queries sent
  */
-type MyUncontrolledInputTypes = { name: string, label: string, value: string | undefined, placeholder?: string, onComplete: (txt: string) => void };
-export function MyUncontrolledInput(props: MyUncontrolledInputTypes) {
+type UncontrolledInputTypes = { name: string, label: string, value: string | undefined, placeholder?: string, onComplete: (txt: string) => void, forcedPrefix?:string };
+
+export function UncontrolledInput(props: UncontrolledInputTypes & {permittedRegex?:RegExp}) {
   const [id] = useState(_uniqueId('pfx-'));
   const { name, label, placeholder, onComplete } = props;
   const [val, setVal] = useState(props.value ?? "");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const reportComplete = useCallback(debounce(val => onComplete(val), 2000), []);
-
+  const restrictInput = (s:string) => {
+    const prefixOK = props.forcedPrefix === undefined || s.startsWith(props.forcedPrefix);
+    if(prefixOK && (props.permittedRegex === undefined || props.permittedRegex.test(s))) { 
+      setVal(s); 
+      reportComplete(s) 
+    }
+  }
   return <FormGroup label={label} labelFor={id} inline>
     <InputGroup id={id} name={name} placeholder={placeholder}
-      onChange={(e) => { setVal(e.currentTarget.value); reportComplete(e.currentTarget.value) }} value={val} onBlur={(e) => onComplete(val)}
+      onChange={(e) => restrictInput(e.currentTarget.value)}  value={val} onBlur={(e) => onComplete(val)}
       onKeyDown={(e) => { if (e.key === 'Enter') { onComplete(val); } }} />
   </FormGroup>;
 }
 
-
+export function KeyParamInput(props: UncontrolledInputTypes) {
+  return <UncontrolledInput { ...props}  permittedRegex={/^[A-Za-z0-9-_]+$/}  />;
+}
 
 export interface WidgetProperties<T> {
   setConfigSaver: (callback: () => any) => void,

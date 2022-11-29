@@ -8,11 +8,13 @@ const  AVariables = (props:WidgetProperties<null>, state:{argMap:{[argKey:string
 
     const [argMap, setArgMap] = useState(props.queryEngine.argMap);
     useEffect(() => {
-        props.queryEngine.addListener(new class extends QueryEngineAdapter {
+        let listener = new class extends QueryEngineAdapter {
             argChange(key: string, newValue: any): void {
                 setArgMap(props.queryEngine.argMap);
             }
-        }());
+        }();
+        props.queryEngine.addListener(listener);
+        return () => props.queryEngine.removeListener(listener);
     },[props.queryEngine]);
 
     return (<div><HTMLTable bordered interactive condensed>

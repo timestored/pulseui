@@ -5,6 +5,7 @@ import { SFormatters } from "./AGrid";
 import writeXlsxFile from 'write-excel-file';
 import { isAdmin, ThemeContext } from "../context";
 import { aNAME } from './../App';
+import { ColFormat } from "./ChartFactory";
 
 //  Popup context menu allowing saving/exporting of data to CSV/excel etc.
 // @TODO - All methods should work similarly and possibly hide _SD_ columns etc.
@@ -15,8 +16,7 @@ import { aNAME } from './../App';
 // 2. Ability to download excel
 // 3. Ability to email tables? - Note the email tables could be used for excel copy-paste but NOT download.
 
-
-export default function AGridContextMenu(props: { srs: SmartRs | null; x: number; y: number; selectionMade: () => void; colName:string, setColumnFormat:(colName:string, colFormat:string)=>void }) {
+export default function AGridContextMenu(props: { srs: SmartRs | null; x: number; y: number; selectionMade: () => void; colName:string, setColumnFormat:(colName:string, colFormat:ColFormat)=>void }) {
     const {srs,colName} = props;
     const context = useContext(ThemeContext);
 
@@ -31,32 +31,11 @@ export default function AGridContextMenu(props: { srs: SmartRs | null; x: number
     const ColMenu = colMenuHidden ?
             <MenuItem icon="column-layout" text="Format Column" onClick={() => {}} disabled={true} ></MenuItem>
         :   <MenuItem icon="column-layout" text="Format Column" onClick={() => {}} >
-                <MenuItem icon="eraser" text="Clear Formatting" onClick={() =>{ props.setColumnFormat(colName,"") }} />
-                <MenuItem icon="floating-point" text="Number" onClick={() =>{ props.setColumnFormat(colName,"NUMBER2") }} >
-                    <MenuItem text="1.1 - 1 Decimal Place" onClick={() =>{ props.setColumnFormat(colName,"NUMBER1") }} />
-                    <MenuItem text="1.12 - 2 Decimal Places" onClick={() =>{ props.setColumnFormat(colName,"NUMBER2") }} />
-                    <MenuItem text="1.123 - 3 Decimal Places" onClick={() =>{ props.setColumnFormat(colName,"NUMBER3") }} />
-                    <MenuItem text="1.1234 - 4 Decimal Places" onClick={() =>{ props.setColumnFormat(colName,"NUMBER4") }} />
-                    <MenuItem text="1.12345 - 5 Decimal Places" onClick={() =>{ props.setColumnFormat(colName,"NUMBER5") }} />
-                    <MenuItem text="1.123456 - 6 Decimal Places" onClick={() =>{ props.setColumnFormat(colName,"NUMBER6") }} />
-                    <MenuItem text="1.1234567 - 7 Decimal Places" onClick={() =>{ props.setColumnFormat(colName,"NUMBER7") }} />
-                    <MenuItem text="1.12345678 - 8 Decimal Places" onClick={() =>{ props.setColumnFormat(colName,"NUMBER8") }} />
-                    <MenuItem text="1.123456789 - 9 Decimal Places" onClick={() =>{ props.setColumnFormat(colName,"NUMBER9") }} />
-                </MenuItem>
-                <MenuItem icon="percentage" text="Percentage" onClick={() =>{ props.setColumnFormat(colName,"PERCENT2") }} >
-                    <MenuItem text="1.1% - 1 Decimal Place" onClick={() =>{ props.setColumnFormat(colName,"PERCENT1") }} />
-                    <MenuItem text="1.12% - 2 Decimal Places" onClick={() =>{ props.setColumnFormat(colName,"PERCENT2") }} />
-                </MenuItem>
-                <MenuItem icon="dollar" text="Currency" onClick={() =>{ props.setColumnFormat(colName,"CURUSD") }} >
-                    <MenuItem text="$1.22 - USD" onClick={() =>{ props.setColumnFormat(colName,"CURUSD") }} />
-                    <MenuItem text="€1.22 - EUR" onClick={() =>{ props.setColumnFormat(colName,"CUREUR") }} />
-                    <MenuItem text="£1.22 - GBP" onClick={() =>{ props.setColumnFormat(colName,"CURGBP") }} />
-                </MenuItem>
-                <MenuItem icon="tag" text="Tags" onClick={() =>{ props.setColumnFormat(colName,"TAG") }} />
-                <MenuItem text="Raw HTML" onClick={() =>{ props.setColumnFormat(colName,"HTML") }} />
+              {getNumberFormatMenuOptions({colName, setColumnFormat:props.setColumnFormat})}
+              {getTextFormatMenuOptions({colName, setColumnFormat:props.setColumnFormat})}
             </MenuItem>;
 
-    return <div className="GRcontextMenu" style={{ top: props.y, left: props.x }}>
+    return <ContextMenu x={props.x} y={props.y}>
         <Menu large={false}>
             <MenuItem icon="clipboard" text="Copy Table" onClick={toCSV} disabled={disabled} />
             <MenuItem icon="download" text="Download CSV" onClick={downCSV} disabled={disabled} />
@@ -66,9 +45,51 @@ export default function AGridContextMenu(props: { srs: SmartRs | null; x: number
             <MenuDivider />
             {ColMenu}
         </Menu>
-    </div>;
+    </ContextMenu>;
 }
 
+export function getTextFormatMenuOptions(props:{colName:string, setColumnFormat:(colName:string, colFormat:ColFormat)=>void }) {
+    const {colName, setColumnFormat} = props;
+    return <>
+        <MenuItem icon="tag" text="Tags" onClick={() =>{ setColumnFormat(colName,"TAG") }} />
+        <MenuItem text="Raw HTML" onClick={() =>{ setColumnFormat(colName,"HTML") }} />
+    </>;
+}
+
+export function getNumberFormatMenuOptions(props:{colName:string, selected?:ColFormat, setColumnFormat:(colName:string, colFormat:ColFormat)=>void }) {
+    const {colName, selected, setColumnFormat} = props;
+    return   <>
+        <MenuItem icon="eraser" text="Clear Formatting" onClick={() =>{ setColumnFormat(colName,"") }} />
+        <MenuItem icon="floating-point" text="Number" onClick={() =>{ setColumnFormat(colName,"NUMBER2") }} >
+            <MenuItem text="1 - 0 Decimal Places" onClick={() =>{ setColumnFormat(colName,"NUMBER0") }}     icon={selected === "NUMBER0" ? "tick" : null} />
+            <MenuItem text="1.1 - 1 Decimal Place" onClick={() =>{ setColumnFormat(colName,"NUMBER1") }}    icon={selected === "NUMBER1" ? "tick" : null} />
+            <MenuItem text="1.12 - 2 Decimal Places" onClick={() =>{ setColumnFormat(colName,"NUMBER2") }}  icon={selected === "NUMBER2" ? "tick" : null} />
+            <MenuItem text="1.123 - 3 Decimal Places" onClick={() =>{ setColumnFormat(colName,"NUMBER3") }} icon={selected === "NUMBER3" ? "tick" : null} />
+            <MenuItem text="1.1234 - 4 Decimal Places" onClick={() =>{ setColumnFormat(colName,"NUMBER4") }}      icon={selected === "NUMBER4" ? "tick" : null} />
+            <MenuItem text="1.12345 - 5 Decimal Places" onClick={() =>{ setColumnFormat(colName,"NUMBER5") }}     icon={selected === "NUMBER5" ? "tick" : null}/>
+            <MenuItem text="1.123456 - 6 Decimal Places" onClick={() =>{ setColumnFormat(colName,"NUMBER6") }}    icon={selected === "NUMBER6" ? "tick" : null}/>
+            <MenuItem text="1.1234567 - 7 Decimal Places" onClick={() =>{ setColumnFormat(colName,"NUMBER7") }}   icon={selected === "NUMBER7" ? "tick" : null}/>
+            <MenuItem text="1.12345678 - 8 Decimal Places" onClick={() =>{ setColumnFormat(colName,"NUMBER8") }}  icon={selected === "NUMBER8" ? "tick" : null}/>
+            <MenuItem text="1.123456789 - 9 Decimal Places" onClick={() =>{ setColumnFormat(colName,"NUMBER9") }} icon={selected === "NUMBER9" ? "tick" : null}/>
+        </MenuItem>
+        <MenuItem icon="percentage" text="Percentage" onClick={() =>{ setColumnFormat(colName,"PERCENT2") }} >
+            <MenuItem text="1% - 0 Decimal Place" onClick={() =>{ setColumnFormat(colName,"PERCENT0") }}     icon={selected === "PERCENT0" ? "tick" : null} />
+            <MenuItem text="1.1% - 1 Decimal Place" onClick={() =>{ setColumnFormat(colName,"PERCENT1") }}   icon={selected === "PERCENT1" ? "tick" : null} />
+            <MenuItem text="1.12% - 2 Decimal Places" onClick={() =>{ setColumnFormat(colName,"PERCENT2") }} icon={selected === "PERCENT2" ? "tick" : null} />
+        </MenuItem>
+        <MenuItem icon="dollar" text="Currency" onClick={() =>{ setColumnFormat(colName,"CURUSD") }} >
+            <MenuItem text="$1.22 - USD" onClick={() =>{ setColumnFormat(colName,"CURUSD") }} icon={selected === "CURUSD" ? "tick" : null} />
+            <MenuItem text="€1.22 - EUR" onClick={() =>{ setColumnFormat(colName,"CUREUR") }} icon={selected === "CUREUR" ? "tick" : null} />
+            <MenuItem text="£1.22 - GBP" onClick={() =>{ setColumnFormat(colName,"CURGBP") }} icon={selected === "CURGBP" ? "tick" : null} />
+        </MenuItem>
+    </>;
+}
+
+export function ContextMenu(props:{children:React.ReactNode, x: number; y: number;}) {
+    return <div className="GRcontextMenu" style={{ top: props.y, left: props.x }}>
+        {props.children}
+    </div>;
+}
 
 
 
@@ -166,7 +187,9 @@ function genCSV(srs:SmartRs, includeHeader:boolean, separator:string = ",") {
             for(var cn=0;cn<keys.length;cn++) {
                 let value = d[rn][keys[cn]];
                 let dtype = srs?.rsdata.tbl.types[keys[cn]];
-                s += (cn === 0 ? "" : P) + getFormatter(dtype)(value);
+                let v = getFormatter(dtype)(value);
+                // If there's a comma, quote it. If when quoting it, escape quotes.
+                s += (cn === 0 ? "" : P) + (v.includes(",") ? ("\"" + (v.includes("\"") ? v.replace("\"","\"\"") : v) + "\"") : v);
             }
             s += N;
         }

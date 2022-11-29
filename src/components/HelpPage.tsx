@@ -1,12 +1,12 @@
 
 import { Button, HTMLTable } from '@blueprintjs/core';
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { Link, Route, Routes } from 'react-router-dom';
 import { RsData, SmartRs } from '../engine/chartResultSet';
-import ChartTypeHelp, { ChartType, getChartHelp, MyUpdatingChart } from './ChartFactory';
+import ChartTypeHelp, { getChartHelp, MyUpdatingChart } from './ChartFactory';
 import { useInterval } from './CommonComponents';
 import { random, sample, sampleSize } from 'lodash-es';
-import { ANAME } from '../App';
+import { ThemeContext } from '../context';
 
 
 function HelpNavMenu() {
@@ -17,23 +17,14 @@ function HelpNavMenu() {
             <div className="docs-nav-divider"></div>            
             <h1><Link to="/help">Help</Link></h1>
             <ul className="docs-nav-menu bp4-list-unstyled">
-                <li><Link to="/help/install">Installation</Link></li>
-                <li><Link to="/help/connections">Connections</Link>
+                <li>
                     <ul>
-                        <li><Link to="/help/subscriptions">Subscribing To Data</Link></li>
+                        <li><Link to="/help/table">Creating Tables</Link></li>
+                        <li><Link to="/help/chart">Creating Charts</Link></li>
+                        <li><Link to="/help/chart/timeseries">Time-Series Charts</Link></li>
+                        <li><Link to="/help/chart/3d">3D Charts</Link></li>
                     </ul>
                 </li>
-                <li><Link to="/help/table">Tables</Link></li>
-                <li><Link to="/help/chart">Charting</Link>
-                    <ul>
-                        <li><Link to="/help/chart/timeseries">Time-Series</Link></li>
-                    </ul>
-                </li>
-                <li><Link to="/help/forms">Forms</Link></li>
-                <li><Link to="/help/email-reports">Email Reports</Link></li>
-                <li><Link to="/help/faq">FAQ</Link></li>
-                <li><Link to="/help/security">Security</Link></li>
-                <li><Link to="/help/release-changes">Release Notes</Link></li>
             </ul>
             <div className="docs-nav-divider"></div>   
         </div></div>
@@ -41,7 +32,7 @@ function HelpNavMenu() {
 }
 
 export default function HelpPage() {
-    useEffect(() => { document.title = ANAME + " Help" }, []);
+    useEffect(() => { document.title = "Pulse Help" }, []);
     return <>
 	<div id="pulse-documentation">
 		<div className="docs-root">
@@ -52,17 +43,11 @@ export default function HelpPage() {
 					<div className="docs-content" data-page-id="pulse">
                         <Routes>
                             <Route path="/" element={<HelpPageHome />} />
-                            <Route path="/install" element={<HelpPageInstall />} />
-                            <Route path="/connections" element={<HelpPageConnections />} />
-                            <Route path="/subscriptions" element={<HelpPageSubscriptions />} />
                             <Route path="/table" element={<HelpPageTable />} />
                             <Route path="/chart"  element={<HelpPageChart/>} />
+                            <Route path="/chart/3d"  element={<HelpPageChart3D/>} />
                             <Route path="/chart/timeseries"  element={<HelpPageTimeSeries/>} />
-                            <Route path="/forms" element={<HelpPageForm />} />
-                            <Route path="/email-reports"  element={<HelpPageEmailReports/>} />
-                            <Route path="/faq"  element={<HelpPageFAQ/>} />
-                            <Route path="/security"  element={<HelpPageSecurity/>} />
-                            <Route path="/release-changes"  element={<HelpPageReleaseNotes/>} />
+                            
                         </Routes>
                     </div>
                 </main>
@@ -71,46 +56,72 @@ export default function HelpPage() {
 
 
 function HelpPageHome() {
-    useEffect(() => { document.title = ANAME + " Help" }, []);
-    return <><div>
-        <h2>What is {ANAME}?</h2>
-        <p>{ANAME} is a tool for real-time visual analysis, email reporting and alerting.
+    useEffect(() => { document.title = "Pulse Help" }, []);
+    return <>
+    <div>
+        <h2>What is Pulse?</h2>
+        <p>Pulse is a tool for real-time visual analysis, email reporting and alerting.
             <br />It allows you to create and share real-time interactive applications with your team 
             <br/> and to send emails and alerts when selected situations occur.
         </p>
         
-        <img src="/img/help/tool-overview.png" width="742" height="364" alt="Visual analysis, emailing reports and alerting." style={{padding:"10px"}}/>
+		<div className="row" style={{height:"20px"}}>
+			<div className="col-lg-12">
+                <p><b>Access <a href="https://www.timestored.com/pulse">Pulse help at timestored.com/pulse/help</a>.</b></p>
+            </div>
+        </div>
+
+		<div className="row" style={{height:"20px"}}>
+			<div className="col-lg-12">
+                <p>Download the latest version at <a href="https://www.timestored.com/pulse">timestored.com/pulse</a>.</p>
+            </div>
+        </div>
+
+		<div className="row" style={{height:"20px"}}>
+			<div className="col-lg-4 col-md-6">
+            </div>
+        </div>
+
+        <video width="98%" height="98%" controls poster="https://www.timestored.com/pulse/video/pulse-build-sql-dashboard.png">
+				<source src="https://www.timestored.com/pulse/video/pulse-build-sql-dashboard.mp4" type="video/mp4" /></video>
+        {/* <img src="./img/help/tool-overview.png" width="742" height="364" alt="Visual analysis, emailing reports and alerting." style={{padding:"10px"}}/> */}
+        {/* <img src="./img/triple-monitor-dashboard.jpg" width="1000" height="563" alt="Visual analysis, emailing reports and alerting." style={{padding:"10px"}}/> */}
     </div></>
 }
 
 function ChartTypeHelpDiv(props: { chartTypeHelp: ChartTypeHelp }) {
+    const context = useContext(ThemeContext);
     let h = props.chartTypeHelp;
     return <div>
-        <h2>{h.chartType + " - " + h.description}</h2>
+        <h2 id={'chartHelp_'+h.chartType}>{h.chartType + " - " + h.description}</h2>
         {h.formatExplainationHtml}
         <table><tr><td>
-            <div style={{ width: 600, height: 300, position: "relative" }}> {MyUpdatingChart.getChart(h.chartType, h.testCase.srs)} </div>
+            <div style={{ width: 600, height: 300, position: "relative" }}> {MyUpdatingChart.getChart(h.chartType, h.testCase.srs, context.theme)} </div>
         </td><td>
-                <div style={{ width: 500, height: 300 }}> {MyUpdatingChart.getChart(ChartType.grid, h.testCase.srs)}
+                <div style={{ width: 500, height: 300 }}> {MyUpdatingChart.getChart("grid", h.testCase.srs)}
                 </div> </td></tr></table>
     </div>
 }
 
 
-function ExamplesFor(props: { chartType?: ChartType }) {
-    let ct = props.chartType;
-    let helpEs = getChartHelp().filter(c => ct === undefined || c.chartType === ct)
-        .map(h => <ChartTypeHelpDiv chartTypeHelp={h} />);
-    return <>
-        {helpEs.length === 0 ? undefined :
-            <h2>{ct && (ct + " ")} Example Charts</h2>}
-        {helpEs}
+function HelpPageChart() {
+    useEffect(() => { document.title = "Pulse Help - Charts" }, []);
+    return <><h1>Help - Charts</h1> 
+        {getChartHelp()
+            // timeseries best shown on it's own page. 3d throws error and breaks firefox.
+            .filter(c => c.chartType !== "timeseries" && c.chartType !== "3dbar" && c.chartType !== "3dsurface")
+            .map(h => <ChartTypeHelpDiv chartTypeHelp={h} />)}
     </>;
 }
 
-function HelpPageChart() {
-    useEffect(() => { document.title = ANAME + " Help - Charts" }, []);
-    return <><h1>Help - Charts</h1> <ExamplesFor /></>;
+
+function HelpPageChart3D() {
+    useEffect(() => { document.title = "Pulse Help - 3D Charts" }, []);
+    return <><h1>Help - 3D Charts</h1> 
+        {getChartHelp()
+            .filter(c =>c.chartType === "3dbar" || c.chartType === "3dsurface")
+            .map(h => <ChartTypeHelpDiv chartTypeHelp={h} />)}
+    </>;
 }
 
 function getGridExampleRsData(): RsData {
@@ -288,7 +299,7 @@ export function DemoChartForHomepage() {
 
     return <><div>
             <h2>{playButton}</h2>
-            {MyUpdatingChart.getChart(ChartType.timeseries, new SmartRs(rsData))}
+            {MyUpdatingChart.getChart("timeseries", new SmartRs(rsData))}
     </div></>;
 }
 
@@ -297,7 +308,7 @@ function HelpPageTimeSeries() {
     const [rsData, setRsData] = useState<RsData>(getTimeseriesExampleRsData(true));
     const [rsData2, setRsData2] = useState<RsData>(getTimeseriesExampleRsData(false));
     const [isPlaying, setPlaying] = useState<boolean>(true);
-    useEffect(() => { document.title = ANAME + " Help - Time Series Charts" }, []);
+    useEffect(() => { document.title = "Pulse Help - Time Series Charts" }, []);
 
     useInterval(() => {
         if (isPlaying) {
@@ -312,31 +323,32 @@ function HelpPageTimeSeries() {
         <h1>Help - Time Series Charts</h1>
 
         <h2>Single Series: &nbsp; {playButton}</h2>
+        <div style={{ width: 1100, height: 350, position: "relative" }}>
+            {MyUpdatingChart.getChart("timeseries", new SmartRs(rsData2))}
+        </div>
 
         <div style={{ width: 1100, height: 350, position: "relative" }}>
-            {MyUpdatingChart.getChart(ChartType.timeseries, new SmartRs(rsData))}
+            {MyUpdatingChart.getChart("timeseries", new SmartRs(rsData))}
         </div>
 
 
         <h3>Configuration</h3>
         <p>You can configure the appearance of a column by adding an <b>_SD_FORMATTER</b> at the end of the column name.
-            <br />For example is a column was call itemPrice, you could name it itemPrice<b>_SD_CIRCLE</b> to show the chart
-            without a line and instead showing circle markers.
+            <br />For example if a column was call itemPrice, you could name it itemPrice<b>_SD_CIRCLE</b> to show the chart
+            without a line and instead showing circle markers. Additionally you could add a column named: itemPrice<b>_SD_SIZE</b> to set the size of the circle/symbol.
         </p>
 
         <HTMLTable condensed striped bordered>
             <thead><tr><th>Area</th><th>Example</th><th>Options</th><th>Description</th></tr></thead>
             <tbody>
                 <tr><th>Shape</th><td>_SD_<b><i>CIRCLE</i></b></td><td>CIRCLE, RECT, ROUNDRECT, TRIANGLE, DIAMOND, PIN, ARROW, NONE</td><td>The shape to use for displaying points in the chart.</td></tr>
+                <tr><th>Shape Size</th><td>_SD_<b><i>SIZE</i></b></td><td>Number 1-99</td><td>The size of the shape to use for displaying points in the chart. You MUST have set an SD_SHAPE first.</td></tr>
             </tbody>
         </HTMLTable>
 
 
         <h2>Highlighting and Formatting by Row: &nbsp; {playButton}</h2>
 
-        <div style={{ width: 1100, height: 350, position: "relative" }}>
-            {MyUpdatingChart.getChart(ChartType.timeseries, new SmartRs(rsData2))}
-        </div>
 
     </div></>
 }
@@ -348,7 +360,7 @@ function HelpPageTable() {
     const [rsData2, setRsData2] = useState<RsData>(getGridHighlightExampleData());
     const [isPlaying, setPlaying] = useState<boolean>(true)
     const [isTableShown ] = useState<boolean>(false)
-    useEffect(() => { document.title = ANAME + " Help - Tables" }, []);
+    useEffect(() => { document.title = "Pulse Help - Tables" }, []);
 
     useInterval(() => {
         if (isPlaying) {
@@ -373,7 +385,7 @@ function HelpPageTable() {
         <h2>Formatting Entire Columns: &nbsp; {playButton}</h2>
 
         <div style={{height:"350px", width:"100%"}}>
-            {MyUpdatingChart.getChart(isTableShown ? ChartType.line : ChartType.grid, new SmartRs(rsData))}
+            {MyUpdatingChart.getChart(isTableShown ? "line" : "grid", new SmartRs(rsData))}
         </div>
 
 
@@ -388,7 +400,7 @@ function HelpPageTable() {
 
         <h3>UI Selected Formatting</h3>
         <p>Below is an example of the formatting menu options:</p>
-        <img src="/img/help/set-formatter-by-column.png" width="755" height="427" alt="Right-Click Set Formatter Options"/>        
+        <img src="./img/help/set-formatter-by-column.png" width="755" height="427" alt="Right-Click Set Formatter Options"/>        
 
         <p>Alternatively by naming columns you can configure a formatter.
         </p>
@@ -420,7 +432,7 @@ function HelpPageTable() {
         <h2>Highlighting and Formatting by Row: &nbsp; {playButton}</h2>
 
         <div style={{ width: 500, height: 320, position: "relative" }}>
-            {MyUpdatingChart.getChart(ChartType.grid, new SmartRs(rsData2))}
+            {MyUpdatingChart.getChart("grid", new SmartRs(rsData2))}
         </div>
 
         <h3>Configuration</h3>
@@ -434,7 +446,7 @@ function HelpPageTable() {
             <tbody>
                 <tr><th>Background Color</th><td>_SD_BG</td><td>#FF0000</td><td>Set the background colour of the original column.</td></tr>
                 <tr><th>Foreground Color</th><td>_SD_FG</td><td>#FF0000</td><td>Set the foreground colour of the original column.</td></tr>
-                <tr><th>CSS Style Name(s)</th><td>_SD_STYLE</td><td>sd_cell_red sd_cell_green</td><td>Set the CSS class of the original column.</td></tr>
+                <tr><th>CSS Style Name(s)</th><td>_SD_CLASS</td><td>sd_cell_red sd_cell_green</td><td>Set the CSS class of the original column.</td></tr>
                 <tr><th>Format Code</th><td>_SD_CODE</td><td>0.xXXx 0.xxXX 0.xXX</td><td>Configure the number of decimal places displayed AND which of the digits are shown larger. 
                                                 This is useful for emphasising basis points for FX currencies etc.</td></tr>
             </tbody>
@@ -445,237 +457,5 @@ function HelpPageTable() {
         <p>Note in the table above, that ASK is a column grouping and that the columns 1/2 occur below ASK. 
             To achieve this the columns are named ASK_1,ASK_2 and Pulse then recognises the grouping automatically.</p>
 
-    </div></>
-}
-
-function HelpPageConnections() {
-    useEffect(() => { document.title = ANAME + " Help - Connections" }, []);
-    return <><div>
-        <h1>Help - Connections</h1>
-        <p>Admin users can create a Connection to a data source. Once a connection is created it can be used within dashboards.</p>
-    </div></>
-}
-
-function HelpPageSubscriptions() {
-    useEffect(() => { document.title = ANAME + " Help - Subscriptions" }, []);
-
-    const cod = '// On the kdb process - define subscription function and timer. \n' 
-        + '.u.sub:{[tblName;symList] bb::.z.w; tName::tblName;};\n'
-        + '.z.ts:{neg[bb] (`.u.upd;`t;update tName:@[get;`tName;`noTname] from ([] t:3#.z.t; a:2 3 4; s:`pp`oo`ii))};\n'
-        + 'system "t 500";\n'
-        + '// From the query box on the dashboard:\n'
-        + '.u.sub[`demoName;::]\n';
-
-    return <><div>
-        <h1>Help - Subscriptions</h1>
-        <p>Most database <Link to="/connections">Connections</Link> use polling to regularly fetch data on a user specified timer.
-        Alternatively you can create a subscription. This means <b>the data source will push updates rather than polling</b>.
-        It can be more efficient for frequently updating data.</p>
-        <p>Currently to create a subscription you should:</p>
-        <ol>
-            <li>Create a "Kdb Streaming" connection type.</li>
-            <li>Specify that connection as a source and set the query. e.g. <code>.u.sub[`tblname;::]</code></li>
-        </ol>
-        <p>Behind the scenes, for every unique subscription including query the server will:</p>
-        <ol>
-            <li>Open a connection to the streaming data source.</li>
-            <li>Send the subscription query.</li>
-            <li>Await incoming data and forward results to the dashboard. For kdb the result format is expected to be (`.u.upd;`tableName;tableData).</li>
-            <li>Keep the connection open until the dashboard is closed.</li>
-        </ol>
-        <p>Basic example kdb code to create a subscription:</p>
-        <textarea value={cod} readOnly rows={10} cols={80} />   
-    </div></>
-}
-
-function HelpPageInstall() {
-
-    const cod = '' 
-    + 'wget http://sqldashboards.com/files/sqldash.zip && unzip sqldash.zip\n'
-    + 'java -jar sqldash/server-0.1-all.jar/\n'
-    + '\n'
-    + '#https://geekflare.com/systemd-start-services-linux-7/\n'
-    + '\n'
-    + 'wget -qO /etc/apt/trusted.gpg.d/google_linux_signing_key.asc https://dl.google.com/linux/linux_signing_key.pub\n' 
-    + 'echo "deb http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google_chrome.list\n' 
-    + 'sudo apt update\n' 
-    + 'sudo apt install -y google-chrome-stable\n' 
-    + 'google-chrome --version\n' 
-    + 'google-chrome --headless --disable-gpu --screenshot=test.png --window-size=1920,1080 https://www.google.com --no-sandbox\n';
-
-    const portset = '' 
-    + 'export SERVER_PORT=8080\n'
-    + 'set SERVER_PORT=8080\n'
-
-    useEffect(() => { document.title = ANAME + " Help - Installation" }, []);
-    return <><div>
-        <h1>Help - Installation</h1>
-        <p>{ANAME} can be installed and ran on windows/linux and mac by downloading the package for that platform and simply running it.
-            The only requirement is to have a java version 1.8+ installed.
-            To enable extra functionality e.g. email reporting  may require additional setup detailed below.
-        </p>
-        <h2 id="linux">Linux</h2>
-        <h3>Reporting - Install Headless Chrome</h3>
-        <p>For Ubuntu:</p>
-        <textarea rows={5} cols={80} value={cod}  readOnly />
-        <p>umask of systemd service should be set to allow file creation in home folder. 
-            As app automatically downloads appropriate driver.
-        </p>
-        <h1>Changing Port</h1>
-        <p>To change port from the default 80, set the environment variable SERVER_PORT.</p>
-        <textarea rows={2} cols={80} value={portset}  readOnly />
-    </div></>
-}
-
-function HelpPageFAQ() {
-    useEffect(() => { document.title = ANAME + " Help - FAQ" }, []);
-    return <><div>
-        <h1>Help - FAQ - Frequently Asked Questions</h1>
-
-        <ul>
-            <li><a href="#export">Exporting Data</a></li>
-            <li><a href="#keyboard">Keyboard Shortcuts</a></li>
-        </ul>
-
-        <h2 id="export">Exporting Data</h2>
-        <p>Data can be exported by right-clicking on any data table and selecting one of the export options: CSV/Excel/Tab separated.</p>
-        <img src="/img/help/context-menu.png" width="590" height="351" alt="table right-click context menu showing export excel options"/>
-
-        <h2 id="keyboard">Keyboard Shortcuts</h2>
-        <p>You can press shift+? to get a listing of what shortcuts are available.</p>
-    </div></>
-}
-
-function HelpPageEmailReports() {
-    useEffect(() => { document.title = ANAME + " Help - Email Reports" }, []);
-    return <><div>
-        <h1>Help - Email Reports</h1>
-        <p><b>Dashboard Reports</b> allow emailing a specific configuration of dashboard at a selected time.</p>
-        <ul>
-            <li>Any user with access can create a report configuration for a dashboard.</li>
-            <li>Any user with access can then subscribe to that report.</li>
-        </ul>
-        <h2>Subscribe to Emailed Report</h2>
-        <p>To subscribe to emails for a dashboard, click on the </p>
-        <img src="/img/help/subscribe-email-report.png" width="752" height="202" alt="Subscribing to an emailed report"/>
-        <img src="/img/help/subscribe-email-report-dropdown.png" width="215" height="245" alt="Subscribing to an emailed report"/>
-        <p>A Dashboard configration includes any form arguments, a time, a screenshot size and other options.</p>
-    </div></>;
-}
-
-function HelpPageSecurity() {
-    useEffect(() => { document.title = ANAME + " Help - Security" }, []);
-    return <><div>
-        <h1>Help - Security</h1>
-        <h2>Authentication</h2>
-        <p>User names and passwords can be validated by either:
-            <ul>
-                <li>The dashboard database. Password hasshes are stored and when a user requests access that hash is checked.</li>
-                <li>A REST call. If parameter XXX is set, that parameter defines where to find an HTTP endpoint that will be used to authenticate username/password.
-                    By default the password is over SSL. The remote call either returns true or false.
-                </li>
-            </ul>
-        </p>
-        <h2>Authorization</h2>
-        <p>All access roles are stored within the internal database. There are currently only 2 levels of access:
-            <ul>
-                <li>Admin - Can access and edit everything.</li>
-                <li>Standard - Can only view everything.</li>
-            </ul>
-        </p>
-    </div></>
-}
-
-function HelpPageReleaseNotes() {
-    useEffect(() => { document.title = ANAME + " Help - Release Notes" }, []);
-    return <div>
-        <h1>Releases</h1>
-        <ul>
-            <li>Version 0.7.4
-                <ul>
-                    <li>Add KDB Streaming Subscriptions</li>
-                    <li>Add ability to set column formatter from context menu</li>
-                    <li>Allow setting query refresh rates</li>
-                </ul>
-            </li>
-            <li>Version 0.7.3
-                <ul>
-                    <li>Add HTML component</li>
-                    <li>Added default queries when new chart added</li>
-                    <li>Reports - screenshot and HTML output can now run</li>
-                    <li>Reports - Add HTML table to email</li>
-                    <li>SQL Editor - Improved kdb support. Added console and list view for non-table objects</li>
-                    <li>Form parameters now use {"{arg}"} and ((arg))</li>
-                </ul>
-            </li>
-            <li>Version 0.7.2
-                <ul>
-                    <li>Add Dashboard history tracking to allow quick restoration of old versions</li>
-                    <li>Users can quick open favourite dashboards</li>
-                    <li>Add User Analytics</li>
-                    <li>Dashboard user arguments to URL allows bookmarking</li>
-                    <li>Add User logins</li>
-                    <li>Add reports / subscriptions CRUD</li>
-                </ul>
-            </li>
-            <li>Version 0.7.1
-                <ul>
-                    <li>Popouts which remember location</li>
-                    <li>Table context menu allows excel/csv download</li>
-                </ul>
-            </li>
-            <li>Version 0.6.6 - Add Screenshot capability</li>
-            <li>Version 0.6.5 - Added SlickGrid table</li>
-            <li>Version 0.6.4 - Automated .exe installer</li>
-            <li>Version 0.6.3 - Added SQL editor.</li>
-            <li>Version 0.6.2 - Alpha Release
-                <ul>
-                    <li>Dashboards - Ability to add charts/tables, save dashboards</li>
-                    <li>Automated Continuous Integration</li>
-                </ul>
-            </li>
-        </ul>
-    </div>;
-}
-
-function HelpPageForm() {
-    return <><div>
-        <h1>Help - Forms</h1>
-        <h2>Query Prameters</h2>
-        <p>Chart and table <b>queries</b> can use <b>Keys</b> to reference parameters.
-        Values can be selected in forms and this will populate the key.</p>
-
-        <p>This form contains one dropdown.
-            <ol>
-                <li> The dropdown is populated from a user supplied list of value|nice name|descriptions. </li>
-                <li>When a user selects a an option, the value gets placed into the key. 
-                    <br />i.e. 1 Hour is selected, the key <i>mins</i> is populated with the value <i>60</i>.</li>
-                <li>This means any query that references the key mins using <b>{"{mins}"}</b> will be updated with the the value 60.</li>
-            </ol>
-        </p>
-        <img src="/img/help/form-creation.png" width="1045" height="439" alt="Creating a form"/>
-        <p>
-        e.g. below is a chart that uses the <i><b>{"{mins}"}</b></i> parameter to configure how many minutes of data to display.
-        <br />Notice the curly braces are used within queries to allow your parameters to be detected and replaced.</p>
-        
-        <img src="/img/help/query-parameter-select.png" width="658" height="523" alt="Creating a form"/>
-
-        <h3>Do I need to use curly braces {"{curlyBraces}"} ?</h3>
-        <p>Yes. Within the SQL code you need a way to identify variables you want to set. 
-            The clearest way to do this is by using containing braces similar BASH script.
-            Other alternatives such as $prefix were considered but these clashed with functions used in some databases.
-        </p>
-        <p><b>OK but I really don't like {"{variable}"} or they are causing problems</b></p>
-        <p>
-            You have two options:
-            <ul>
-                <li><b>Escape characters</b> e.g. {"\\{"} can be used to force {"{"} to be sent. 
-                If you need to send a curly brace and do NOT want it relpaced or used as a parameter, escapte it.</li>
-                <li><b>((keyName)) can alternatively be used.</b> Instead of {"{variableName}"} you can do ((variableName)) 
-                this is currently not recommended as we think it will be more fragile for some databases longer term.
-                <br />
-                One benefit of this notation is that with the kdb database, this is valid code and would just run within the query editor assuming the variable is defined.</li>
-            </ul>
-        </p>
     </div></>
 }

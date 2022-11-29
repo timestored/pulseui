@@ -12,6 +12,16 @@
 body {
   margin: 0;
   font-family: "Nunito Sans", sans-serif;
+  line-height: 1;
+}
+
+.bodydark::-webkit-scrollbar { width: 12px; }
+.bodydark::-webkit-scrollbar-track { background: #222;  }
+.bodydark::-webkit-scrollbar-thumb { background-color: #666; }
+
+.App .ui-widget {
+  font-size: 0.83em;
+  font-family: "Nunito Sans", sans-serif;
 }
 
 code {
@@ -21,6 +31,129 @@ code {
 
 tr.highRow { background: #FBB360; }
 .bp4-breadcrumbs  { padding: 25px 0; }
+
+$bodybg-c:#111217;
+$bodybg-light-c:#EEE;
+$menubg-dark-c:#181B1F;
+$menutxt-dark-c:#bebebe;
+$greyyc-c:#444;
+$blew-c:#2C92B6;
+$blew-selected:#3DB2E2;
+$slickbg-c:#333;
+body { background-color: $bodybg-light-c; }
+body.bodydark { background-color: $bodybg-c; }
+
+
+.bp4-dark table.bp4-html-table.bp4-html-table-striped tbody tr:nth-child(2n+1) th {
+  background: rgba(95, 107, 124, 0.15);
+}
+
+.infoNotyfy { background-color: #F92;}
+.infoNotyfy { background-color: #F92;}
+
+
+/**************************** .Collapsible *****************************/
+// defined within dashboardPage to reduce scope.
+.dashboardPage {
+  #SubConfigEditor {
+    .aform .bp4-input { height:auto; }
+  }
+  // .Collapsible { background-color: transparent; }
+
+  .Collapsible__contentInner {
+    padding: 5px 5px 5px 25px;
+    border: 1px solid $slickbg-c;
+    border-top: 0; }
+    .Collapsible__contentInner p {
+      margin-bottom: 5px;
+      font-size: 12px;
+      line-height: 15px; }
+      .Collapsible__contentInner p:last-child {
+        margin-bottom: 0; }
+
+  .Collapsible__trigger {
+    margin-top: 8px;
+    display: block;
+    font-weight: 400;
+    text-decoration: none;
+    color: $slickbg-c;
+    position: relative;
+    border: 1px solid $greyyc-c;
+    padding: 4px 5px;
+    background: $bodybg-c;
+    color: $bodybg-light-c; }
+    .Collapsible__trigger:after {
+      font-family: 'FontAwesome';
+      content: '⌄';
+      position: absolute;
+      right: 10px;
+      top: 3px;
+      display: block;
+      transition: transform 300ms; }
+    .Collapsible__trigger.is-open:after {
+      transform: rotateZ(180deg); }
+    .Collapsible__trigger.is-disabled {
+      opacity: 0.5;
+      background-color: $greyyc-c; }
+
+  .CustomTriggerCSS {
+    background-color: $blew-c;
+    transition: background-color 200ms ease; }
+
+  .CustomTriggerCSS--open {
+    background-color: $blew-selected; }
+
+  .Collapsible__custom-sibling {
+    padding: 5px;
+    font-size: 12px;
+    background-color: $blew-c;
+    color: black; }
+}
+
+
+/**************************** flexlayout - start *****************************/
+#root .flexlayout__tab_button:hover,#root .flexlayout__tab_button  {
+  background-color: #a3bada;
+  font-size: 80%;
+  color:#ccc;
+}
+#root .Appdark .flexlayout__tab_button,#root .Appdark .flexlayout__tab_button:hover {
+  background-color: $bodybg-c;
+}
+.flexlayout__tab_toolbar button { margin:0; padding:0; }
+
+#root .Appdark .flexlayout__tab_button--unselected {
+  background-color: transparent !important;
+}
+#root .flexlayout__tab_button--unselected {
+  background-color: transparent !important;  
+  color:#555;
+}
+
+// #root .flexlayout__tabset_tabbar_outer_top { display:none; height:0; } - HIDE TAB
+
+#root .flexlayout__tabset-selected {
+  background-color: none;
+  background-image: none;
+}
+#root .App .flexlayout__tabset_tabbar_outer_top  { border-bottom: 1px solid #333;}
+#root .App .flexlayout__tabset-selected { border-bottom: 1px solid $blew-c;}
+#root .flexlayout__tabset_tabbar_outer_top { border-bottom: none;}
+.dupeicon { background-color: transparent; border:0;  }
+
+.Appdark .flexlayout__tab { background-color: $bodybg-c !important;}
+.Appdark .flexlayout__tabset_tabbar_outer { background-color: $bodybg-c !important;}
+
+#root .Appdark .flexlayout__splitter {
+  background-color: $greyyc-c;
+}
+#root .Appdark .flexlayout__splitter:hover,#root .Appdark .flexlayout__splitter:active,#root .Appdark .flexlayout__splitter:focus {
+  background-color: $blew-c;
+}
+
+
+/**************************** flexlayout - end *****************************/
+
 
 /**************************** DOCS *****************************/
 // docs-root > docs-app > (aside>docs-nav-wrapper>docs-nav) THEN (main>docs-content-wrapper>docs-content-wrapper)
@@ -32,12 +165,10 @@ tr.highRow { background: #FBB360; }
 
 .docs-app img {
   border:2px solid #555;
-  box-shadow: 10px 10px 5px #ccc;
-  -moz-box-shadow: 10px 10px 5px #ccc;
-  -webkit-box-shadow: 10px 10px 5px #ccc;
-  -khtml-box-shadow: 10px 10px 5px #ccc;
   margin:10px 10px;
 }
+
+.docs-content h1 { margin:25px auto; }
 
 .docs-content-wrapper {
   -webkit-box-align: start;
@@ -56,6 +187,89 @@ tr.highRow { background: #FBB360; }
   position: fixed;
 }
 
+.docs-content .db-integrations img {
+  filter: url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\'><filter id=\'grayscale\'><feColorMatrix type=\'matrix\' values=\'0.3333 0.3333 0.3333 0 0 0.3333 0.3333 0.3333 0 0 0.3333 0.3333 0.3333 0 0 0 0 0 1 0\'/></filter></svg>#grayscale"); /* Firefox 3.5+ */
+  filter: gray; /* IE6-9 */
+  -webkit-filter: grayscale(100%); /* Chrome 19+ & Safari 6+ */
+  padding:10px;
+  border:0;
+  margin:0;
+}
+
+.Appdark .db-integrations img { 
+  -webkit-filter:  grayscale(100%) invert(1);
+  filter:  grayscale(100%) invert(1);
+}
+
+.docs-content .db-integrations img:hover {
+  filter: none;
+  -webkit-filter: grayscale(0%);
+}
+
+
+/* Creates wrapped boxes on first help page */
+
+
+.icon-box-s3 {
+  padding: 50px 50px 45px;
+  margin-bottom: 30px;
+  border: 1px solid #d4d4d4;
+  border-radius: 10px;
+  transition: all 0.3s linear;
+  -webkit-transition: all 0.3s linear;
+  -moz-transition: all 0.3s linear;
+  -o-transition: all 0.3s linear;
+  -ms-transition: all 0.3s linear;
+}
+.icon-box-s3:hover {
+  border-color: #7141b1;
+}
+.icon-box-s3 .top-box {
+  overflow: hidden;
+  margin-bottom: 50px;
+}
+.icon-box-s3 .icon-main {
+  float: left;
+  text-align: center;
+  width: 65px;
+  height: 65px;
+  line-height: 65px;
+  background: #f4f2fc;
+  border-radius: 50%;
+  transition: all 0.3s linear;
+  -webkit-transition: all 0.3s linear;
+  -moz-transition: all 0.3s linear;
+  -o-transition: all 0.3s linear;
+  -ms-transition: all 0.3s linear;
+}
+.icon-box-s3:hover .icon-main {
+  background: #7141b1;
+}
+.icon-box-s3 .icon-main svg {
+  width: 45px;
+  fill: #7141b1;
+  vertical-align: middle;
+  transition: all 0.3s linear;
+  -webkit-transition: all 0.3s linear;
+  -moz-transition: all 0.3s linear;
+  -o-transition: all 0.3s linear;
+  -ms-transition: all 0.3s linear;
+}
+.icon-box-s3:hover .icon-main i, .icon-box-s3:hover .icon-main svg {
+  color: #fff;
+  fill: #fff;
+}
+.icon-box-s3 .top-box a {
+  float: right;
+  font-size: 14px;
+  font-weight: 700;
+  color: #666;
+}
+.icon-box-s3 h5 {
+  font-size: 24px;
+  font-weight: 500;
+  margin-bottom: 15px;
+}
 
 /**************************** loginPage *****************************/
 .loginPage { 
@@ -68,31 +282,44 @@ tr.highRow { background: #FBB360; }
 }
 
 /**************************** SlickGrid *****************************/
+.bodydark .slick-gridmenu {
+  background: $menubg-dark-c !important; 
+  border: $menubg-dark-c !important; 
+  color:$menutxt-dark-c !important; 
+  box-shadow: none;
+}
+.bodydark .slick-gridmenu .blue {  color:$menutxt-dark-c !important;  }
+.bodydark .slick-gridmenu .slick-gridmenu-item-divider  {
+  background:$greyyc-c !important; 
+}
+.bodydark .slick-gridmenu hr {
+  border-top: 1px solid $greyyc-c;
+}
 
-
+#root button.filterButton { padding:0; margin:0; }
 
 .GRcontextMenu {
   position:fixed;
-  background: #e1efc7;
-  border: 1px solid gray;
-  padding: 2px;
+  padding: 0;
   display: inline-block;
   min-width: 100px;
-  -moz-box-shadow: 2px 2px 2px silver;
-  -webkit-box-shadow: 2px 2px 2px silver;
-  box-shadow: 2px 2px 2px silver;
   z-index: 99999;
+  font-size: 0.8em;
+  border:1px solid #bbb; 
 }
+
+.GRcontextMenu ul { padding:0; }
 
 .GRcontextMenu li {
-  padding: 4px 4px 4px 14px;
+  padding: 0;
   list-style: none;
   cursor: pointer;
-  // background: url("../images/arrow_right_peppermint.png") no-repeat center left;
 }
 
-.GRcontextMenu li:hover {
-  background-color: white;
+.GRcontextMenu li:hover { background-color: $bodybg-light-c; }
+.Appdark .GRcontextMenu {  border:1px solid #555; }
+.Appdark .GRcontextMenu li:hover { 
+  color:black;
 }
 
 
@@ -115,7 +342,6 @@ tr.highRow { background: #FBB360; }
 
 .blue { color: rgb(73, 73, 255); }
 .orange { color: orange; }
-.red { color: red; }
 .bold { font-weight: bold; }
 .italic { font-style: italic; }
 .rightAligned { text-align: right; }
@@ -133,7 +359,8 @@ tr.highRow { background: #FBB360; }
 .slick-headerrow-column input {
   margin: 0;
   padding: 0;
-  width: 100%;
+  margin-left:1px;
+  width: calc(100% - 17px);
   height: 100%;
   -moz-box-sizing: border-box;
   box-sizing: border-box;
@@ -153,6 +380,120 @@ tr.highRow { background: #FBB360; }
   cursor: pointer;
 }
 
+
+
+.Appdark .slick-pane.slick-pane-header.slick-pane-left{
+  color: #9EA7A7;
+}
+.Appdark .ui-state-default.slick-header-column{
+  color: #9EA7A7;
+}
+
+.Appdark .ui-state-default.slick-header-column:hover{
+  color: #EEE;
+}
+
+.Appdark .ui-state-default{
+  background: transparent;
+}
+.slick-preheader-panel .slick-header.ui-state-default.slick-header-left{
+  border: none;
+}
+.slick-pager { color: #444; }
+
+.Appdark .slick-pager{
+  color: #9EA7A7;
+}
+#prefix-3{
+  border: 1px solid silver !important;
+}
+.Appdark #prefix-3{
+  border: 1px solid #5C5C5C !important;
+}
+.Appdark .slick-preheader-panel.ui-state-default  {
+  border: none;
+}
+#prefix-4,
+#prefix-8{
+  width: 100% !important;
+}
+
+
+
+// slickgrid dark mode
+
+.grcontainer {
+  background-color: #DDD;
+  .slick-gridmenu-button {
+    z-index: 10;
+  }
+  .slick-header {
+    .slick-header-column {
+      border-color: transparent;
+      position: relative;
+      
+      &::before {
+        content: "";
+        width: 1px;
+        background: #424242;
+        height: 15px;
+        position: absolute;
+        top: 50%;
+        right: 0px;
+        transform: translateY(-50%);
+      }
+    }
+  }
+
+  .slick-row .slick-cell {
+      border: 0;
+      padding-top:0;
+      padding-bottom:0;
+      line-height: 24px;
+
+  }
+}
+
+
+.slick-row {
+  &.even { background: #EEEEFF; }
+}
+
+.Appdark {
+
+  .grcontainer {
+    background-color: #242424;
+    .slick-preheader-panel { background: #424242; }
+    .slick-pane-header { background: $slickbg-c; 
+      .slick-header { background: $slickbg-c; border: $slickbg-c;
+        .slick-header-column { background: $slickbg-c; font-weight: bold; color:#CCC; }
+      }
+    }
+
+    .slick-row {
+      &.odd { background: #222222; }
+      &.even { background: $bodybg-c; }
+      .slick-cell { color: #f5f5f5; }
+    }
+
+    .slick-headerrow {
+      border-top: 1px solid transparent;
+
+      .slick-headerrow-column {
+        border: 0;
+      }
+    }
+
+    .slick-pager {
+      background: #242424;
+      border:none;
+    }
+    
+    .slick-row .slick-cell {
+      border-bottom: 1px solid #5c5c5c;
+    }
+  }
+}
 
 /**************************** GR = GRidContainer  *****************************/
 
@@ -188,6 +529,15 @@ tr.highRow { background: #FBB360; }
   overflow-x: hidden !important;
 }
 
+.grcontainer .status,.grcontainer .bp4-tag { color:#222; padding-top: 0; padding-bottom: 0; min-height: auto; }
+.Appdark .grcontainer .status,.Appdark .grcontainer .bp4-tag { color:#eee; }
+.grcontainer .status { background-color: #818080;}
+.grcontainer .status-new { background-color: #2d72d2;}
+.grcontainer .status-success { background-color: #238551;}
+.grcontainer .status-warning { background-color: #cc6613;}
+.grcontainer .status-danger { background-color: #aa3824;}
+
+
 /**************************** SlickGrid  END *****************************/
 
 .App {
@@ -195,7 +545,7 @@ tr.highRow { background: #FBB360; }
 }
 
 .Appdark {
-  background-color: #293742;
+  background-color: $bodybg-c;
 }
 
 .bp4-form-group.bp4-inline {
@@ -203,17 +553,23 @@ tr.highRow { background: #FBB360; }
 }
 
 .page {
-  margin: 5px 100px auto;
+  margin: 5px 6% auto;
   padding: 0 2%;
 }
+
+
+.logoImg { width:96px; height:20px;  background-image: url('../public/img/logo-dark.png'); background-size: cover;  }
+.Appdark .logoImg { background-image: url('../public/img/logo-white.png'); }
+#root .topNavBar .logoImg { background-image: url('../public/img/logo-white.png'); }
 
 /* Page: Dash id=x */
 
 #dashfooter {
   position: fixed;
-  left: 0;
-  bottom: 0;
-  width: 100%;
+  height:90%;
+  right:0;
+  top: 63px;
+  width: 600px;
 }
 
 #dashfooter ul {
@@ -228,9 +584,17 @@ a:hover {
 
 
 .topNavBar {
-  padding:2px 100px;
+  padding:1px 10px 4px;
   background-color: #1D43A7;
+  box-shadow: none !important;
 }
+
+.Appdark .topNavBar {
+  background-color: #40455A;
+}
+
+.topNavBar .dashTitle { font-size: 70%; text-align: center; vertical-align: middle; margin:5px 0 0 50px; }
+.topNavBar .bp4-navbar-group, .bp4-navbar { height:32px !important; }
 
 /** topNavBar  **/
 .topNavBar .bp4-button  { color: #a7b6c2; }
@@ -239,40 +603,47 @@ a:hover {
   background-color: transparent;
 }
 
-@media (max-width: 1324px) {
-  .topNavBar { padding:2px 50px; }
-  .dashboardPage .topNavBar .leftNavbarGroup .bp4-button-text { display:none; }
-  .dashboardPage .topNavBar .leftNavbarGroup .bp4-button { padding:2px; margin:2px; }
+@media (max-width: 1100px) {
+  .topNavBar .leftNavbarGroup .bp4-navbar-divider { display:none; }
+  .topNavBar .bp4-button-text { display:none; }
+  .topNavBar .dashTitle { margin-left:10px; }
 }
-@media (max-width: 1124px) {
-  .topNavBar { padding:2px 10px; }
-  .dashboardPage .topNavBar .bp4-button-text { display:none; }
-  .dashboardPage .topNavBar .bp4-button { padding:2px; margin:2px; }
+@media (max-width: 900px) {
+  .topNavBar .bp4-button { padding:2px; margin:2px; }
+  .dashboardPage .editToggle { padding:1px;  margin:0 1px 0 1px; }
 }
 
-#appPage .topNavBar .bp4-button, #appPage .topNavBar span { color: white; }
-#appPage .topNavBar .bp4-button.bp4-intent-primary , #appPage .topNavBar .bp4-intent-primary  span  { color: #f5e830; }
-// #appPage .topNavBar .bp4-button.bp4-intent-success , #appPage .topNavBar .bp4-intent-success  span  { color: rgb(134, 200, 204); }
+@media (max-width: 650px) {
+  .topNavBar  .bp4-button-text { display:none; }
+  .topNavBar  .bp4-navbar-divider { display:none; }
+  .topNavBar .rightNavBar { display:none; }
+  // .topNavBar .logoImg { width:48px; height:13px;background-size: 100% 100%; background-repeat: no-repeat;}
+  .topNavBar .dashTitle { margin-left:0; }
+}
+
+@media (max-width: 600px) {
+  .topNavBar .editToggle { display:none; }
+}
+
+#appPage .topNavBar .bp4-button, #appPage .topNavBar span, #appPage .topNavBar { color: white; }
 
 #appPage .TopMenu {
   margin-bottom: 2px;
   padding-top: 2px;
   text-align: center;
-  background-color: #111;
 }
+
 
 #appPage .TopMenu .bp4-button {
-  background-color: #111;
-  color:white;
-  border:0;
+  /* background-color: #111; color:white; border:0; */
+  margin:0 1px;
 }
-
 #flexContainer {
   position: relative;
   margin-left: 5px;
   margin-right: 5px;
   /* height: 90vmax; */
-  height: calc(100vh - 100px);
+  height: calc(100vh);
   border: 1px solid gray;
 }
 
@@ -287,10 +658,24 @@ a:hover {
   width: 100%;
 }
 
+/*** EDITOR2 is the code editors shown on sql editor page AND dashboardpage drawer. 
+ drawerFormWrapper - Is only the AFORM editor
+ .aform is the resulting form  to ONLY edit the dashboard aform editor **/
 #editor2 .bp4-form-group {
   float: left;
   margin: 0 5px;
 }
+
+#editor2 table td { padding:0; vertical-align: middle; text-align: center;  }
+#editor2 table button { margin:0; padding:0 }
+#editor2 #editor2-footer-addbuttons path { stroke: #444 !important; color:#444 !important}
+.Appdark #editor2 #editor2-footer-addbuttons path { stroke: #ccc !important;  color:#ccc !important}
+
+#editor2 .formMyModal label { display:inline; }
+#editor2 .formMyModal .datePickerConfig label { display:block; }
+
+.FormComponents {  min-width: 500px; }
+
 
 
 /**************************** #pageMain - i.e. The first page opened *****************************/
@@ -307,7 +692,7 @@ a:hover {
   padding: 30px 0 10px 0;
 }
 
-#pageMain section.home-top {}
+#pageMain section.home-top { margin-top: 0; padding-top: 0; }
 
 #pageMain section.home-intro {}
 
@@ -331,7 +716,7 @@ a:hover {
   border-radius: 10px;
  }
 #pageMain section.home-demo {
-  background-color: #293742; 
+  background-color: $bodybg-c; 
   color:#EEE;
  }
  #pageMain section.home-demo canvas {
@@ -346,18 +731,118 @@ a:hover {
   text-align: center;
  }
 
+ #pageMain .splashContainer {
+  width:100%;
+  background-image: url(../public/img/multi-chart3-dark.jpg);
+  background-repeat: no-repeat;
+  background-size:cover;  
+  height:700px;
+  font-size: 200%;
+  color:#F6F7F9;
+  margin: 0;
+ }
+
+ #pageMain .splashContainer .toprow {
+  margin:200px 200px auto 100px;
+  background-color: rgba(0, 0, 0, 0.7);
+ }
+ 
+@media (max-width: 868px) {
+  #pageMain .splashContainer .toprow {
+   margin:10px 10px auto 10px;
+   height:400px;
+  }
+  #pageMain .splashContainer {
+    height:400px;
+    font-size: 150%;
+  }
+}
+@media (max-width: 500px) {
+  #pageMain .splashContainer {
+    height:300px;
+    font-size: 120%;
+  }
+}
+ 
+ #pageMain .buttoncontainer {
+  position:relative;
+  top:-20px;
+  font-size: 200%;
+  text-align: center;
+  width:90%;
+ }
 
 /**************************** #pageMain - END *****************************/
 
 
 /**************************** .dashboardpage - i.e.One single dashboard *****************************/
-.dashboardpage {}
+.dashboardPage {
+  height:100%;
+}
+
+.dashboardPage .aeditor textarea { width:100%;  }
+.dashboardPage .aeditorModal textarea { width:100%; }
+.dashboardPage .aeditor-controls { position:sticky; top:0; width:100%; z-index: 10; }
+
+
+.dashboardPage .editToggle {
+  padding:2px; 
+  margin:0 2px 0 40px; 
+}
+
+.dashboardPage .editToggle .bp4-control { margin:auto 2px; }
+
+
+
+/**************************** .switch-field *****************************/
+
+.dashboardPage {
+    .switch-field {
+      display: flex;
+      margin-bottom: 2px;
+      overflow: hidden;
+
+    }
+    
+    .switch-field input {
+      position: absolute !important;
+      clip: rect(0, 0, 0, 0);
+      height: 1px;
+      width: 1px;
+      border: 0;
+      overflow: hidden;
+    }
+    
+    .switch-field label {
+      background-color: #e4e4e4;
+      color: rgba(0, 0, 0, 0.6);
+      font-size: 14px;
+      line-height: 2;
+      text-align: center;
+      padding: 3px 7px;
+      margin-right: -1px;
+      border: 1px solid rgba(0, 0, 0, 0.2);
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px rgba(255, 255, 255, 0.1);
+      transition: all 0.1s ease-in-out;
+    }
+    
+    
+    .switch-field input:checked + label {
+      background-color: $blew-selected;
+      box-shadow: none;
+    }
+    
+    .switch-field label:hover { cursor: pointer; }
+    // .switch-field label:first-of-type { border-radius: 4px 0 0 4px; }
+    // .switch-field label:last-of-type { border-radius: 0 4px 4px 0; }
+}
+
 /**************************** .dashboardpage - END *****************************/
 
 
 /**************************** .dashpage - i.e. The page listing all of the dashboards *****************************/
 
-.dashpage #dashboardListing { margin-bottom: 30px;}
+.dashpage #dashboardListing { margin-bottom: 20px;}
 .dashpage #dashboardListing::after {  clear: both; content: ''; display: block; }
 
 .dashpage #demoListing  { margin-bottom: 30px;}
@@ -374,13 +859,11 @@ a:hover {
 
 /**************************** .sqleditorpage   *****************************/
 .sqleditorpage {}
+
+.sqleditorpage .serverTree li.entityNode { padding:0; margin:0 }
+.sqleditorpage .serverTree  { font-size: 0.9em; }
+.sqleditorpage .serverTree .bp4-tree-node-content  { height:auto; margin-top: 1px;}
 /**************************** .sqleditorpage - END *****************************/
-
-
-.page {
-  margin: 5px 100px auto;
-  padding: 0 2%;
-}
 
 /* QueryableEditor 
  * Codemirror is purposefully positioned bottom and allowed to be whatever length needed.
@@ -388,56 +871,65 @@ a:hover {
   * Finally to keep controls visible, we make them sticky.
 */
 
-.App .QueryableEditorControls { background-color: white;}
-.Appdark .QueryableEditorControls { background-color: black;}
 
 .QueryableEditorControls {
   position:sticky; position: -webkit-sticky;
   top:0; 
   z-index:11;
-  display:flex;
+  display:inline-flex;
   width:100%;
   margin:0; padding:0; 
-  background:pink;
   z-index:10;
-  background:inherit;
+  vertical-align: middle;
+  background-color: #FFFFFF; /* THIs is needed for floating SqlEditorPage controls */
+  border-bottom:1px solid #aaa;
 }
+.mydrawer .QueryableEditorControls { background:#EEE }
+.Appdark .QueryableEditorControls { background:$menubg-dark-c; }
 
 .QueryableEditorControls select,button,label {
   padding:2px; margin:5px;
 }
+.chartSelect button { width:150px; margin-left: 2px; }
 
 .cm-scroller { overflow: auto; }
 .cm-editor .cm-content { font-family: "Consolas";}
 .cm-editor.cm-focused { outline: 2px solid cyan }
 .cm-content { border:1px solid #cdcdcd}
+.cm-scroller { min-height: 200px; max-height: 50%;}
 /* CommonComponents */
 
 .mydrawer {
-  overflow-y: scroll;
-  border-top: 3px outset grey;
-  background: white;
+  border-top: 1px groove $greyyc-c;
+  border-left: 1px groove $greyyc-c;
+  border-bottom: 1px groove $greyyc-c;
+  border-radius: 1px;
+  background-color: $bodybg-light-c;
 }
+
+.drawerFormWrapper {
+  overflow-y: auto;
+  height:99vh;
+}
+
 .Appdark .mydrawer {
-  background-color: #293742;
+  background-color: $menubg-dark-c;
 }
 
 .mydrawer h2 {
-  border-bottom: 1px solid grey;
-  margin: 5px 0 5px;
+  margin: 1px 0;
   padding: 0;
+  font-size: 90%;
 }
 
 .mydrawer .drawerClose {
-  float: right;
+  position:fixed; position: -webkit-sticky;
+  right:10px;
+  z-index:12;
 }
 
 .mydrawer .drawerFormWrapper {
-  height: 230px;
   padding-bottom: 20px;
-}
-.mydrawer .drawerForm {
-  margin: auto 2% auto 2%;
 }
 
 table.bp4-html-table-condensed {
@@ -457,10 +949,43 @@ table.bp4-html-table-condensed th {
 // floatbox = jdenticon front, top title, p shown on hover
 // floatbox2 = background image, foreground title, p shown on hover
 
+
+.dashboxContainer{
+  width: 270px;
+  height: 150px;
+  position: relative;
+}
+.dashbox{
+  width: 100%;
+  height: 100%;            
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.dashbox-top{
+  z-index: 9;
+  width:150px; height:150px;
+}
+
+
+.Appdark .floatbox,.Appdark .floatbox2 {
+  border-color:$slickbg-c;
+}
+#dashboardListing .floatbox2:hover,#dashboardListing .floatbox:hover {
+  border-color:$blew-c;
+}
+.Appdark .floatbox a,.Appdark .floatbox2 a {
+  color:#ccc;
+}
+
+.Appdark .floatbox:hover a,.Appdark .floatbox2:hover a {
+  color:#eee;
+}
+
 .floatbox,.floatbox2 {
   float: left;
   transition: box-shadow 0.3s;
-  border: 1px solid grey;
+  border: 2px solid #bbb;
   margin: 4px;
   padding: 2px 4px;
   border-radius: 10px;
@@ -473,13 +998,11 @@ table.bp4-html-table-condensed th {
 }
 
 
-
 .floatbox2:hover { 
-  filter:grayscale(20%);
+  filter:grayscale(0%);
 }
 .floatbox2 {
-  filter:grayscale(70%);
-  opacity: 0.95; 
+  filter:brightness(150%) contrast(120%);
   background-size:cover;
 }
 
@@ -527,6 +1050,18 @@ table.bp4-html-table-condensed th {
   margin:10px;
 }
 
+.Appdark .floatbox img {
+  filter:brightness(130%) contrast(130%) saturate(110%);
+}
+.Appdark .floatbox:hover img {
+  filter:brightness(150%) contrast(150%) saturate(150%);
+}
+.floatbox img {
+  filter:saturate(170%);
+}
+.floatbox:hover img {
+  filter:brightness(100%) contrast(100%) saturate(100%);
+}
 .floatbox p.whenhover {
   margin:0 0 -25px 0;
   padding:0;
@@ -535,12 +1070,18 @@ table.bp4-html-table-condensed th {
   border-radius: 10px;
   position: relative;
   top:-25px;
+  z-index: 10;
+  background-color: #111;
+}
+.Appdark {
+  background-color: $menubg-dark-c;
+}
+.floatbox p.whenhover .bp4-button-text {
+  color:#999;
 }
 
-
 .floatbox:hover p.whenhover {
-  opacity: 0.9;
-  background-color: #333;
+  opacity: 0.95;
 }
 
 /* ###############     Floatbox - end */
@@ -554,12 +1095,47 @@ table.bp4-html-table-condensed th {
   max-height: 200px;
 }
 
-.aform {
-  padding: 5px 10px;
+#editor2 .AFormComponentEditor .hardcodedQueryEditor { margin-top:5px; }
+#editor2 .AFormComponentEditor { border-top: 1px solid $slickbg-c; margin-top: 5px;}
+#editor2 .drawerFormWrapper table,#editor2 .drawerFormWrapper select,#editor2 .drawerFormWrapper input,#editor2 .drawerFormWrapper textarea { 
+  font-size: 11px;
 }
 
-.aform * {
-  margin: 1px;
+.aform { 
+  padding: 2px 5px; 
+  display: flex;
+  line-height: 16px;
+  font-size: 15px;
+}
+.aform label { margin:2px}
+
+.aformVert {
+  flex-direction: column;
+}
+
+.aformHorizontal {
+  flex-direction: row;
+  width:90%;
+}
+
+.aformRow {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  vertical-align: middle;
+}
+
+.aform {
+
+  .bp4-input {
+    height:22px;
+  }
+
+  .bp4-numeric-input {
+      button { margin:0; height:10px; flex: 0.4 0.4 5px !important;}
+
+  }
+
 }
 
 /** CommonComponents **/
@@ -583,50 +1159,19 @@ table.bp4-html-table-condensed th {
   color: grey 
 }
 
-.sd_cell_green {
-  background-color: #11cc1180;
+.sd_cell_green,.SD_CELL_GREEN,.slick-cell .green,.slick-cell .GREEN {
+  background-color: rgba(99, 255, 9, 0.5);
 }
-.sd_cell_red {
-  background-color: #cc111180;
+.sd_cell_red,.SD_CELL_RED,.slick-cell .red,.slick-cell .RED {
+  background-color: rgba(255, 0, 0, 0.5);
 }
-.sd_cell_red {
-  background-color: #cc111180;
-}
+
+
 .databar {
   border: 1px solid black;
   padding: 0 0 1px 0;
   margin: 0;
 }
-
-/******* footer *******/
-
-footer h2 {
-  font-family: "Nunito Sans",Sans-serif;
-  font-size: 48px;
-  font-weight: 400;
-  color: #1b1d21;
-  margin-bottom: 0;
-}
-footer {
-  width: 100%;
-  padding: 0 220px 0 70px;
-}
-
-.Appdark .site-footer {
-  background-color: #383E47;
-}
-.site-footer a { color:white; }
-.site-footer {
-  background: #1D43A7;
-  color:white;
-  padding-top: 10px;
-  border-top: 1px solid #BBB;
-  position:fixed;
-  bottom:0px;
-  z-index:13;
-}
-
-
 
 
 
@@ -698,7 +1243,7 @@ dfn {
 }
 h1 {
   font-size: 2em;
-  margin: 0.67em 0;
+  margin: 0.67em 0 0.1em;
 }
 mark {
   background: #ff0;

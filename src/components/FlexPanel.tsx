@@ -1,14 +1,14 @@
 import React, { Component, createRef, ReactNode, RefObject } from 'react';
 import { Action, TabNode, Layout, Model, Actions, TabSetNode, BorderNode, IJsonModel } from "flexlayout-react";
-import { Button, EditableText, H1, Menu, MenuDivider, MenuItem, NonIdealState, Popover, Position } from "@blueprintjs/core";
+import { Button, ButtonGroup, EditableText, H1, Icon, Menu, MenuItem, NonIdealState, Popover, Position } from "@blueprintjs/core";
 import Counter from './Counter';
 import AIFrame from './AIFrame';
-import { notyf, ThemeContext } from '../context';
-import { ChartType, MyUpdatingChart } from './ChartFactory';
-import { AxiosError } from "axios";
+import { notyf, ThemeContext, topNotyf } from '../context';
+import { ChartType, getChartIcon, MyUpdatingChart } from './ChartFactory';
+import axios, { AxiosError } from "axios";
 import { Dash, getDash, saveDash } from "./DashPage";
-import QueryEngine from "../engine/queryEngine";
-import { VscDebug, VscSymbolVariable } from "react-icons/vsc";
+import QueryEngine, { SERVER } from "../engine/queryEngine";
+import { VscSymbolVariable } from "react-icons/vsc";
 import { DiWebplatform } from "react-icons/di";
 import AForm from './AForm';
 
@@ -18,13 +18,21 @@ import { Link } from 'react-router-dom';
 import AVariables from './AVariables';
 import AText from './AText';
 import { isAdmin } from './../context';
+import 'flexlayout-react/style/light.css';
+import '../dark.css';
+import AEditor from './AEditor';
+import html2canvas from 'html2canvas';
+
+export const DEFAULT_GLOBAL = {
+    tabEnableClose:false, tabEnableFloat:true, tabSetAutoSelectTab:true, 
+    splitterSize:1, splitterExtra:10,
+    // This option is essential. Because we use a listener pattern
+    // If the tabs are only created after a query, they do not contain that queries result.
+    tabEnableRenderOnDemand:false, 
+}
 
 const defaultJson : IJsonModel = {
-    global: {tabEnableClose:false, tabEnableFloat:true, tabSetAutoSelectTab:true, 
-        // This option is essential. Because we use a listener pattern
-        // If the tabs are only created after a query, they do not contain that queries result.
-        tabEnableRenderOnDemand:false, 
-    },
+    global: DEFAULT_GLOBAL,
     borders: [],
     // layout: { type: "row", weight: 100,  children:  [] }
     "layout": {
@@ -33,7 +41,7 @@ const defaultJson : IJsonModel = {
         "children": [ { "type": "tabset", "id": "#8c7aa838-3d1e-4feb-af09-a32b41446ebc",
                 "children": [
                     { "type": "tab", "id": "#07bd8ea1-7e79-4d63-b507-18d1a7626c12", "name": "Welcome", "component": "atext",
-                        "config": { "dashstate": { "html": "<div style='margin:5px 40px;'>\n<h1>Welcome</h1>\n<p>This is a new empty dashboard.</p>\n<p>If you are an admin, you can click the <button type=\"button\" disabled=\"\" class=\"bp4-button bp4-intent-primary\"><span icon=\"edit\" aria-hidden=\"true\" tabindex=\"-1\" class=\"bp4-icon bp4-icon-edit\"><svg data-icon=\"edit\" width=\"16\" height=\"16\" viewBox=\"0 0 16 16\"><path d=\"M3.25 10.26l2.47 2.47 6.69-6.69-2.46-2.48-6.7 6.7zM.99 14.99l3.86-1.39-2.46-2.44-1.4 3.83zm12.25-14c-.48 0-.92.2-1.24.51l-1.44 1.44 2.47 2.47 1.44-1.44c.32-.32.51-.75.51-1.24.01-.95-.77-1.74-1.74-1.74z\" fill-rule=\"evenodd\"></path></svg></span><span class=\"bp4-button-text\">edit</span></button> button on the top right<br /> this will display a toolbar row that allows you to add components to your dashboard. <br />You can double-click on the dashboard title or on the tab titles to rename either. </p>\n\n<p>Click the small <span style=\"width:50px; background:#EEEEEE\">grid <svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" style=\"width: 1em; height: 1em;  align-items: center;\"><path fill=\"none\" d=\"M0 0h24v24H0z\"></path><path stroke=\"var(--color-icon)\" fill=\"var(--color-icon)\" d=\"M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z\"></path></svg></span> on the tab header of this component to delete it.</p>\n\n<p>Once you have made any changes you want to save and publish for others. Click <button type=\"button\" disabled=\"\" class=\"bp4-button bp4-intent-primary\"><span icon=\"floppy-disk\" aria-hidden=\"true\" tabindex=\"-1\" class=\"bp4-icon bp4-icon-floppy-disk\"><svg data-icon=\"floppy-disk\" width=\"16\" height=\"16\" viewBox=\"0 0 16 16\"><path d=\"M15.71 2.29l-2-2A.997.997 0 0013 0h-1v6H4V0H1C.45 0 0 .45 0 1v14c0 .55.45 1 1 1h14c.55 0 1-.45 1-1V3c0-.28-.11-.53-.29-.71zM14 15H2V9c0-.55.45-1 1-1h10c.55 0 1 .45 1 1v6zM11 1H9v4h2V1z\" fill-rule=\"evenodd\"></path></svg></span><span class=\"bp4-button-text\">Save</span></button>.\n\n</div>" } }
+                        "config": { "dashstate": { "html": "<div style='margin:5px 40px;'>\n<h1>Welcome</h1>\n<p>This is a new empty dashboard.</p>\n<p>If you are an admin, you can <b>click the Design Mode toggle button at the top of the page.</b></p><p>This will display a toolbar row that allows you to add components to your dashboard. <br />You can double-click on the dashboard title or on the tab titles to rename either. </p>\n\n<p>Click the small <span style=\"width:50px; background:#EEEEEE\">grid <svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" style=\"width: 1em; height: 1em;  align-items: center;\"><path fill=\"none\" d=\"M0 0h24v24H0z\"></path><path stroke=\"var(--color-icon)\" fill=\"var(--color-icon)\" d=\"M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z\"></path></svg></span> on the tab header of this component to delete it.</p>\n\n<p>Once you have made any changes you want to save and publish for others. Click <button type=\"button\" disabled=\"\" class=\"bp4-button bp4-intent-primary\"><span icon=\"floppy-disk\" aria-hidden=\"true\" tabindex=\"-1\" class=\"bp4-icon bp4-icon-floppy-disk\"><svg data-icon=\"floppy-disk\" width=\"16\" height=\"16\" viewBox=\"0 0 16 16\"><path d=\"M15.71 2.29l-2-2A.997.997 0 0013 0h-1v6H4V0H1C.45 0 0 .45 0 1v14c0 .55.45 1 1 1h14c.55 0 1-.45 1-1V3c0-.28-.11-.53-.29-.71zM14 15H2V9c0-.55.45-1 1-1h10c.55 0 1 .45 1 1v6zM11 1H9v4h2V1z\" fill-rule=\"evenodd\"></path></svg></span><span class=\"bp4-button-text\">Save</span></button>.\n\n</div>" } }
                     } ],
                 "active": true }
         ]
@@ -50,6 +58,9 @@ interface FlexPanelState {
 interface FlexPanelProps {
     queryEngine:QueryEngine, dashId:number, versionId?:number, editMode:boolean, setTitle:(txt:JSX.Element) => void
 }
+
+type WidgetType = "iframe"|"aeditor"|"atext"|"variables"|"aform"|ChartType;
+
 /**
  * Note either a dashId alone is specified OR dashId+version, if a verison is specified it meants
  * that the user wants to READ-ONLY see an old verison, hence why !editPermitted. They could choose to restore it elsewhere.
@@ -67,7 +78,10 @@ export default class FlexPanel extends Component<FlexPanelProps,FlexPanelState> 
     private isEditPermitted = () => this.props.editMode && this.props.versionId === undefined;
     
     changeName = (newName:string) => { // @ts-ignore
-        if(!isAdmin(this.context)) {
+        if(!this.isEditPermitted()) {
+            alert("You must be in edit mode to change dashboard names.");
+            return false;
+        } else if(!isAdmin(this.context)) {
             alert("You must be an admin to change dashboard names.");
         } else if (newName.length < 1) {
             alert("You must enter a valid name");
@@ -90,7 +104,7 @@ export default class FlexPanel extends Component<FlexPanelProps,FlexPanelState> 
                 model = Model.fromJson(defaultJson);
             }
             const header = <H1>
-                    <EditableText maxLength={25} defaultValue={dash?.name} selectAllOnFocus={true} disabled={!this.isEditPermitted()} onConfirm={this.changeName}/>
+                    <EditableText className='dashTitle' maxLength={25} defaultValue={dash?.name} selectAllOnFocus={true} onConfirm={this.changeName}/>
                 </H1>;
             this.props.setTitle(header);
             this.setState({ dash, model });
@@ -123,7 +137,7 @@ export default class FlexPanel extends Component<FlexPanelProps,FlexPanelState> 
         const selected = this.isEditPermitted() && this.state.selectedId === node.getId();
         const clearSelected = () => this.setState({selectedId:""});
         let setConfigSaver = (callback:() => any) => {
-            node.setEventListener("save", (p) => {
+            node.setEventListener("save", (p:any) => {
                 node.getConfig().dashstate = callback();
             });
         }
@@ -139,35 +153,45 @@ export default class FlexPanel extends Component<FlexPanelProps,FlexPanelState> 
             r = (<Counter {...widgetProps} />);
         } else if (component === "iframe") {
             r = (<AIFrame {...widgetProps} />);
+        } else if (component === "aeditor") {
+            r = (<AEditor {...widgetProps} format="Text" />);
         } else if (component === "aform") {
             r = (<AForm {...widgetProps} />);
         } else if (component === "variables") {
             r = (<AVariables {...widgetProps} />);
         } else {
-            const chartType = ChartType[component as keyof typeof ChartType];
+            const chartType = component as ChartType;
             r = <MyUpdatingChart {...widgetProps} chartType={chartType} tabNode={node} />;
         }
-        return <span onClick={() => this.setState({selectedId:node.getId()})}>{r}</span>;
+        return <span onClick={() => this.setState({selectedId:node.getId()})} id={"widget-"+node.getId().replaceAll("#","")} className={"widget widget-"+node.getName()}>{r}</span>;
     }
 
-    handleAddWidget = (name: string) => {
+    handleAddWidget = (name: WidgetType) => {
         console.log('trying to add tab');
         var jsonChild = { component: name, name: name, config: {} };
-        if(this.state?.model?.getRoot().getChildren()[0].getChildren().length === 0) {
-            this.layoutRef.current!.addTabToActiveTabSet(jsonChild);
-        } else {
-            this.layoutRef.current!.addTabWithDragAndDrop("Drag this panel<br>to your desired location", jsonChild);
+        let a:TabNode[] = [];
+        let m = this.state?.model;
+        if(m != null) {
+            m.visitNodes((nd) => { if(nd.getType()==="tab") { a.push(nd as TabNode); } })
+            if(a.length === 1 && a[0].getName()==="Welcome") {
+                m.doAction(Actions.deleteTab(a[0].getId()));
+            }
+            if(m.getRoot().getChildren()[0].getChildren().length === 0) {
+                this.layoutRef.current!.addTabToActiveTabSet(jsonChild);
+            } else {
+                this.layoutRef.current!.addTabWithDragAndDrop("Click to position this panel<br>to your desired location", jsonChild);
+                topNotyf('Click to drop the panel in that location.');
+            }
         }
     }
 
     render() {
         const { model } = this.state;
-        require("flexlayout-react/style/" + (this.context.theme === "dark" ? "dark" : "light") + ".css");
         model?.doAction(Actions.updateModelAttributes({ tabEnableClose:this.isEditPermitted() }));
         let sc = this.state.serverConfigs;
 
         return (
-            <div>
+            <div className={"FlexPanel dashname-"+this.state.dash?.name.replaceAll(" ","-")} id={"dashid-"+this.props.dashId}>
             {this.isEditPermitted() && <TopMenu addWidget={this.handleAddWidget} saveDashboard={this.saveDashboard} />}
             
             {sc?.length === 0 && 
@@ -175,10 +199,11 @@ export default class FlexPanel extends Component<FlexPanelProps,FlexPanelState> 
                         action={<div>Try  <Link to="/connections"><Button intent="primary">Adding Connections</Button></Link></div>} />}
 
             {(sc && sc.length > 0) && 
-            <FlexContainer isSelected={this.isEditPermitted() && this.state.selectedId} >
+            <FlexContainer isSelected={this.isEditPermitted() && this.state.selectedId} id="dashScreenshotContainer" >
                 {model && <Layout ref={this.layoutRef} model={model} factory={this.factory.bind(this)}
                                 onAction={this.handleAction}  
                                 onRenderTabSet={this.onRenderTabSet} 
+                                font={{size:"16px"}}
                                 //onModelChange={() => this.setState({modelChangesSaved:false})} Could listen to detect unsaved changes
                 />}
             </FlexContainer>}
@@ -199,7 +224,7 @@ export default class FlexPanel extends Component<FlexPanelProps,FlexPanelState> 
         const node = tabSetNode.getSelectedNode()
         if (node && this.isEditPermitted()) {
             const id = 'tab_settings_popover_' + tabSetNode.getId();
-            renderValues.buttons.push(<Button key={id} icon="duplicate" onClick={() => { 
+            renderValues.buttons.push(<button className="dupeicon" key={id} onClick={() => { 
                 this.state.model!.toJson(); // fake save, to force models to put state into JSON
                 let n = this.state.model?.getNodeById(tabSetNode.getId());
                 if(n) {
@@ -207,76 +232,103 @@ export default class FlexPanel extends Component<FlexPanelProps,FlexPanelState> 
                     let tn = n.getChildren()[0] as TabNode;
                     if(tn) {
                         var jsonChild = { component: tn.getComponent(), name: tn.getName() + " copy", config:tn.getConfig() };
-                        this.layoutRef.current!.addTabWithDragAndDropIndirect("Drag this panel<br>to your desired location", jsonChild);
+                        this.layoutRef.current!.addTabWithDragAndDrop("Click to position this panel<br>to your desired location", jsonChild);
                     }
                 }
-            }}></Button>)
+            }}><Icon icon="duplicate" size={14} color="#888" className="flexlayout__tab_toolbar_button flexlayout__tab_toolbar_button-float" title="Copy Chart"/></button>)
         }
     }
 
     saveDashboard = () => {
         console.debug("saving FlexPanel layout");
         if (this.state.dash) {
-            let d: Dash = { ...this.state.dash, ...{ data: this.state.model!.toJson() } };
+            const url = window.location.href;
+            const p = url.indexOf("?");
+            const params = p !== -1 ? url.substring(p) : "";
+            let d: Dash = { ...this.state.dash, ...{ data: this.state.model!.toJson(), defaultParams:params } };
+            
             saveDash(d).then(r => {
-                    notyf.success("Saved successfully.");
-                    if(this.state.dash !== null) {
-                        let dash = {...this.state.dash,version:this.state.dash.version+1};
-                        this.setState({dash})
-                    }
-                }).catch((e) => {
-                    notyf.error("Save Failed.");
+                notyf.success("Saved successfully.");
+                if(this.state.dash !== null) {
+                    let dash = {...this.state.dash,version:this.state.dash.version+1};
+                    this.setState({dash})
+                }
+            }).catch((e) => {
+                notyf.error("Save Failed.");
+            });
+
+            // After saving the critical data. Try to get a screenshot for the thumbnail.
+            let el = document.getElementById("dashScreenshotContainer") || document.body;
+            el.style.width = (16*(el.clientHeight/9.0)) + "px"; // Setting width and height messed up the layout
+            delay(500).then(() => {  notyf.success({type:"info", message:"Taking screenshot"});})
+            delay(1500).then(() => { // Delay needed to let layout "adjust"
+                // Without background, the screenshot had left/right edges.
+                html2canvas(el, {scale:0.5, backgroundColor:this.context.theme === "dark" ? "#444" : "#CCC"}).then((canvas) => { 
+                    axios.post<Dash>(SERVER + "/dashboard/" + d.id + "/img", canvas.toDataURL(),  {headers:{"Content-Type":"text/plain"}});
+                }).catch(e => {
+                    notyf.error("Screenshot Failed.");
+                }).finally(() => {    
+                    el.style.width = '';
+                    el.style.filter = '';
                 });
+            });
             // localStorage.setItem("bobby", jsonStr);
         }
     }
 
 }
 
+function delay(ms:number) {
+    return new Promise((resolve) => {
+       setTimeout(resolve, ms);
+    })
+ }
+ 
+
 interface TopMenuProps {
-    addWidget: (name: string) => void;
+    addWidget: (name: WidgetType) => void;
     saveDashboard: () => void;
 }
 
 
+
+
 function TopMenu(props:TopMenuProps) {
     const { addWidget } = props;
+    const s = true;
+    const cts:ChartType[] = ["bar", "stack", "bar_horizontal", "stack_horizontal", "line", "area", "pie"];
+    const makeBut = (c:ChartType, txt:string|null = null) => <Button  key={c} small={true} onClick={() => addWidget(c)} icon={getChartIcon(c)}>{txt}</Button>;
+    const makeMenu = (c:ChartType, txt:string) => <MenuItem onClick={() => addWidget(c)} key={c} icon={getChartIcon(c)} text={txt}></MenuItem>;
+    return <div className="TopMenu">
+        <ButtonGroup onMouseEnter={()=>{}} >
+            {makeBut("grid","Table")}
+            {makeBut("timeseries","Time Series")}
+            {cts.map(c => makeBut(c))}
+            <Popover content={<Menu>
+                    {makeMenu("bubble","Bubble")}
+                    {makeMenu("radar","Radar")}
+                    {makeMenu("candle","Candlestick")}
+                    {makeMenu("calendar","Calendar")}
+                    {makeMenu("boxplot","Boxplot")}
+                    {makeMenu("sunburst","Sunburst")}
+                    {makeMenu("tree","Tree")}
+                    {makeMenu("3dsurface","Surface")}
+                    {makeMenu("3dbar","3D Bar Chart")}
+                </Menu>
+                }  position={Position.BOTTOM} minimal>
+                <Button icon="series-add" key="other" rightIcon="caret-down" >Other Charts</Button>
+            </Popover>
 
-    return (
+            <Button small={s} icon="form" key="aform" onClick={() => addWidget("aform")}>User Form</Button>
+            
+            <Button small={s} key="iframe"  onClick={() => addWidget("iframe")} icon="globe" text="Website" />
+            <Button small={s} key="aeditor" onClick={() => addWidget("aeditor")} icon="annotation" text="Editor" />
+            <Button small={s} key="atext"   onClick={() => addWidget("atext")} icon={<DiWebplatform />} text="HTML" />
+            
+            <Button small={s} key="variables"  onClick={() => addWidget("variables")} icon={<VscSymbolVariable />} text="Debug" />
+            
+            <Button small={s} key="save"  icon="floppy-disk" onClick={() => { props.saveDashboard();}} intent="primary">Save</Button>
+        </ButtonGroup>
+    </div>;
+}
 
-<div className="TopMenu">
-    <Button onClick={() => addWidget("grid")} icon="th">Table</Button>
-
-    <Popover content={<Menu>
-            <MenuItem onClick={() => addWidget("timeseries")} icon="series-add" text="Time Series" />
-            <MenuDivider />
-            <MenuItem onClick={() => addWidget("bar")} icon="timeline-bar-chart" text="Bar" />
-            <MenuItem onClick={() => addWidget("bar")} icon="horizontal-bar-chart" text="Bar Horizontal" />
-            <MenuItem onClick={() => addWidget("stack")} icon="stacked-chart" text="Bar Stacked" />
-            <MenuDivider />
-            <MenuItem onClick={() => addWidget("line")} icon="timeline-line-chart" text="Line" />
-            <MenuItem onClick={() => addWidget("area")} icon="timeline-area-chart" text="Area" />
-            <MenuItem onClick={() => addWidget("pie")} icon="pie-chart" text="Pie" />
-            <MenuItem onClick={() => addWidget("bubble")} icon="scatter-plot" text="Bubble" />
-        </Menu>
-        }  position={Position.BOTTOM} minimal>
-        <Button icon="series-add">Add Chart</Button>
-    </Popover>
-    <Button icon="form" onClick={() => addWidget("aform")}>Add Form</Button>
-
-    <Popover content={<Menu>
-            <MenuItem onClick={() => addWidget("iframe")} icon="globe" text="IFrame" />
-            <MenuItem onClick={() => addWidget("counter")} icon="numerical" text="counter" />
-            <MenuItem onClick={() => addWidget("atext")} icon={<DiWebplatform />} text="Web Page" />
-            </Menu>}  position={Position.BOTTOM} minimal>
-        <Button icon="add">Add Other</Button>
-    </Popover>
-    
-    <Popover content={<Menu>
-            <MenuItem onClick={() => addWidget("variables")} icon={<VscSymbolVariable />} text="Variable Window" />
-            </Menu>}  position={Position.BOTTOM} minimal>
-        <Button icon={<VscDebug />}>Debug</Button>
-    </Popover>
-    <Button icon="floppy-disk" onClick={() => { props.saveDashboard();}} intent="primary">Save</Button>
-    </div>
-)};
