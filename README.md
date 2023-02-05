@@ -15,3 +15,4 @@ Databases that are wire compatible with postgres/mysql should also work i.e. tim
 Currently client source is only available to allow those that purchase Pulse to access the source code.
 Pulse is a commercial product and copyright TimeStored.
 .  
+.  
