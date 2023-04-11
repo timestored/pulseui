@@ -415,10 +415,10 @@ function HelpPageTable() {
                 <tr><th>Status Flags</th><td><span className="bp4-tag bp4-intent-success .modifier">Done</span></td><td>_SD_STATUS</td><td>No options.</td>
                     <td>Highlight the text with an appropriate color based on the text content assuming the text repsents a task. e.g.
                         <ul>
-                            <li>Blue = new, open, created, ready</li>
-                            <li>Amber = runnable, waiting, partial, blocked, flagged, suspended</li>
-                            <li>Red = removed, cancelled, rejected</li>
-                            <li>Green = terminated, resolved, closed, done, complete, filled</li>
+                            <li>Blue = new, open, created, ready, starting</li>
+                            <li>Amber = runnable, waiting, partial, blocked, flagged, suspended, paused, stopping</li>
+                            <li>Red = removed, cancelled, rejected, stopped</li>
+                            <li>Green = terminated, resolved, closed, done, complete, filled, running</li>
                         </ul>
                     </td>
                 </tr>

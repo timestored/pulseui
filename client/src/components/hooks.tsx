@@ -95,6 +95,11 @@ function useEventListener<K extends keyof WindowEventMap>(
 
   type SetValue<T> = Dispatch<SetStateAction<T>>
   
+  export function getLocalStorage<T>(key: string, defaultValue: T){
+    const item = window.localStorage.getItem(key)
+    return item ? (parseJSON(item) as T) : defaultValue;
+  }
+
   function useLocalStorage<T>(key: string, initialValue: T, listenToAllWindows:boolean = true): [T, SetValue<T>] {
     // Get from local storage then
     // parse stored json or return initialValue

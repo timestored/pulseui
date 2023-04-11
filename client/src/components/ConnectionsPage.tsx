@@ -1,7 +1,7 @@
 import React, { useState, useEffect, Component } from 'react';
 import axios from 'axios';
 import { Number, String, Array, Record, Static, Undefined, Partial } from 'runtypes';
-import { Alert, Button, FormGroup, HTMLTable, InputGroup, Intent, Spinner, MaybeElement, Icon, IconName, HTMLSelect, SpinnerSize, Collapse } from '@blueprintjs/core';
+import { Alert, Button, FormGroup, HTMLTable, InputGroup, Intent, Spinner, MaybeElement, Icon, IconName, HTMLSelect, SpinnerSize, Collapse, NonIdealState } from '@blueprintjs/core';
 import { SERVER } from '../engine/queryEngine';
 import { MyInput, MyOverlay } from './CommonComponents';
 import { Enumify } from 'enumify';
@@ -37,6 +37,9 @@ export async function fetchProcessServers(process: (s: ServerConfig[]) => void) 
         })
 };
 
+export function containsUserConn(serverConfigs:ServerConfig[]) {
+    return serverConfigs.length > 1 || (serverConfigs.length === 1 && serverConfigs[0].name.toUpperCase() !== "DEMODB");
+}
 
 function ConnectionsPage() {
     const [serverConfigs, setServerConfigs] = useState<ServerConfig[]>([]);
@@ -56,6 +59,7 @@ function ConnectionsPage() {
                     ServerConfigR.check(r.data);
                     notyf.success("Connection Added");
                     fetchProcessServers(setServerConfigs);
+                    setEditId(r.data);
                 }).catch((e) => {
                     notyf.error("Connection Failed to Add");
                 });
@@ -78,13 +82,17 @@ function ConnectionsPage() {
         fetchProcessServers(setServerConfigs);
     }
     const isEmpty = serverConfigs.length === 0;
+    const addDCbutton = <Button icon="add" small onClick={() => { setEditId(newServerConfig); }} intent={containsUserConn(serverConfigs) ? "primary" : "success"}>Add Data Connection</Button>;
 
     return <><div>
-        <Button icon="add" small onClick={() => { setEditId(newServerConfig); }} >Add Data Connection</Button>
-        <Button icon="edit" small onClick={() => { setEditServerList(true); }} >Add Server List</Button>
-        {isEmpty ?
-            <ConnectionHelp addConn={addConn} />
-            : <HTMLTable condensed striped bordered interactive>
+        <h1>Connections</h1>
+        <div className="topButtons">
+            {addDCbutton}
+            <Button icon="edit" small onClick={() => { setEditServerList(true); }} >Add Server List</Button>
+        </div>
+        {!containsUserConn(serverConfigs) && <NonIdealState className="firstSteps" layout='horizontal' icon="data-connection" title="Data Connection Required" 
+                                            description="You should first add a connection to access your own data."  action={addDCbutton}/>}
+        { !isEmpty  && <HTMLTable condensed striped bordered interactive>
                 <thead><tr><th>name</th><th>type</th><th>host:port</th><th>database</th><th>credentials</th><th>edit</th><th>delete</th></tr></thead>
                 <tbody>
                     {serverConfigs.map(sc => {
@@ -110,6 +118,7 @@ function ConnectionsPage() {
                 </tbody>
             </HTMLTable>
         }
+        {!containsUserConn(serverConfigs) &&  <ConnectionHelp addConn={addConn} />}
         <MyOverlay isOpen={editId !== undefined} handleClose={clearSelection} title={(editId?.id === -1 ? "Add" : "Edit") + " Data Connection"}>
             <ConnectionsEditor serverConfig={editId!} clearSelection={clearSelection} />
         </MyOverlay>
@@ -287,11 +296,11 @@ export function JdbcSelect(props: { jdbcTypeSelected?: string, onChange: (e: Rea
     </>
 }
 
-export function AjaxResButton(props: { mystate: AjaxResult, succeededMsg: string }) {
+export function AjaxResButton(props: { mystate: AjaxResult, succeededMsg?: string }) {
     const st = props.mystate.state;
     return <>{st === undefined ? null :
         st === "running" ? <Spinner size={SpinnerSize.SMALL} intent="primary" />
-            : st === "succeeded" ? <Button icon="tick" minimal>{props.succeededMsg}</Button>
+            : st === "succeeded" ? <Button icon="tick" minimal>{props.succeededMsg ?? props.mystate.msg ?? "Success"}</Button>
                 : st === "failed" ? <div><Button icon="cross" minimal intent="danger">Failed</Button> {props.mystate.msg}</div>
                     : null}</>
         ;
@@ -301,28 +310,17 @@ export function AjaxResButton(props: { mystate: AjaxResult, succeededMsg: string
 
 export function ConnectionHelp(props: { addConn: (jc: jdbcConnection) => void }) {
     return <><div>
-        <h1>Help - Connections</h1>
-        <div>Connections Supported:
-            <ul>
-                {jdbcConnection.enumValues.map(v => { const n = (v as jdbcConnection).niceName;  return <li key={n}>{n}</li> })}
-            </ul>
-        </div>
+        <h1>Help</h1>
+        <h2>Create Connection:</h2>
+        <p>Click on one of the below to create a connection using default settings on your local machine:</p>
         <div>
-            <h2>Create Connection:</h2>
-            <p>Click on one of the below to create a connection using default settings on your local machine:</p>
-            <div>
-                <JdbcCoverPanel jdbcConn={jdbcConnection.MSSERVER} addConn={props.addConn} />
-                <JdbcCoverPanel jdbcConn={jdbcConnection.POSTGRES} addConn={props.addConn} />
-                <JdbcCoverPanel jdbcConn={jdbcConnection.MYSQL} addConn={props.addConn} />
-            </div>
-            <br style={{ clear: "left" }} />
-            <div>
-                <JdbcCoverPanel jdbcConn={jdbcConnection.H2} addConn={props.addConn} />
-                <JdbcCoverPanel jdbcConn={jdbcConnection.KDB} addConn={props.addConn} />
-                <JdbcCoverPanel jdbcConn={jdbcConnection.CLICKHOUSE} addConn={props.addConn} />
-            </div>
-            <br style={{ clear: "left" }} />
+            <JdbcCoverPanel jdbcConn={jdbcConnection.KDB} addConn={props.addConn} />
+            <JdbcCoverPanel jdbcConn={jdbcConnection.MSSERVER} addConn={props.addConn} />
+            <JdbcCoverPanel jdbcConn={jdbcConnection.POSTGRES} addConn={props.addConn} />
+            <JdbcCoverPanel jdbcConn={jdbcConnection.MYSQL} addConn={props.addConn} />
+            <JdbcCoverPanel jdbcConn={jdbcConnection.CLICKHOUSE} addConn={props.addConn} />
         </div>
+        <br style={{ clear: "left" }} />
     </div></>
 }
 

@@ -10,7 +10,7 @@ import ConnectionsPage from './components/ConnectionsPage';
 import DashboardPage from './components/DashboardPage';
 import { MyNavBar, selOption } from './components/CommonComponents';
 import HelpPage, { DemoChartForHomepage } from './components/HelpPage';
-import DashPage, { DashHistoryPage } from './components/DashPage';
+import DashPage, { DashHistoryPage, DashboardPageRaw } from './components/DashPage';
 import TestPage from './components/TestPage';
 import SqlEditorPage from './components/SqlEditorPage';
 import { ThemeContext, ThemeType } from './context';
@@ -26,7 +26,7 @@ import UserPage from './components/UserPage';
 import DashReportPage from './components/DashReportPage';
 import { notyf } from './context';
 import { get } from 'lodash-es';
-
+import SettingsPage from './components/SettingsPage';
 
 const myPlugin = {
   name: 'c', //@ts-ignore
@@ -43,54 +43,57 @@ const myPlugin = {
 }
 let myPlugins = [myPlugin];
 
-if(window.location.href.indexOf("timestored.com") !== -1) {
-  // Initialize with your site ID and Matomo URL
-  const MURL = "https://www.timestored.com/mat/matomo.php";
-  const eventDets = { 'idsite':1, rec:1, 'apiv':1, };
-  const paramsSerializer = (params:any) => {
-      // Sample implementation of query string building
-      let result = '';
-      Object.keys(params).forEach(key => {
-          result += `${key}=${encodeURIComponent(params[key])}&`;
-      });
-      return result.substring(0, result.length - 1);
-  }
-  const matomoPlugin = {
-    name: 'matomoPlugin', //@ts-ignore
-    page: ({ payload }) => {
-      const { meta } = payload;
-      const offerId = window.localStorage.getItem('offerId');
-      const uid = offerId !== null ? offerId : (payload.userId || payload.anonymousId);
-      try {
-        const eevent = { 
-          ...eventDets,
-          'uid': uid,
-          'url':window.location.href,
-          'action_name':document.title,
-          'cdt': meta.ts
-        };
-        axios && axios.get(MURL, {params:eevent, paramsSerializer:paramsSerializer});
-      } catch {}
-    },//@ts-ignore
-    track: ({ payload }) => {
-      const { meta, properties, event } = payload;
-      const offerId = window.localStorage.getItem('offerId');
-      const uid = offerId !== null ? offerId : (payload.userId || payload.anonymousId);
-      const eevent = { // e_c/a/n/v = category, action, name, value
-        ...eventDets,
-        'uid': uid,
-        'url': window.location.href,
-        'cdt': meta.ts,
-        'e_c': event,
-        'e_a': event,
-        'e_n': properties.dashName,
-        'e_v': properties.dashId
-      };
-      axios && axios.get(MURL, {params:eevent, paramsSerializer:paramsSerializer});
-    },
-  };
-  myPlugins = [myPlugin, matomoPlugin];
-}
+// if(window.location.href.indexOf("timestored.com") !== -1) {
+//   // Initialize with your site ID and Matomo URL
+//   const MURL = "https://www.timestored.com/mat/matomo.php";
+//   const eventDets = { 'idsite':1, rec:1, 'apiv':1, };
+//   const paramsSerializer = {
+//     encode: (params:any) => {
+//       // Sample implementation of query string building
+//       let result = '';
+//       Object.keys(params).forEach(key => {
+//           result += `${key}=${encodeURIComponent(params[key])}&`;
+//       });
+//       return result.substring(0, result.length - 1);
+//     }
+//   }
+
+//   const matomoPlugin = {
+//     name: 'matomoPlugin', //@ts-ignore
+//     page: ({ payload }) => {
+//       const { meta } = payload;
+//       const offerId = window.localStorage.getItem('offerId');
+//       const uid = offerId !== null ? offerId : (payload.userId || payload.anonymousId);
+//       try {
+//         const eevent = { 
+//           ...eventDets,
+//           'uid': uid,
+//           'url':window.location.href,
+//           'action_name':document.title,
+//           'cdt': meta.ts
+//         };
+//         axios && axios.get(MURL, {params:eevent, paramsSerializer:paramsSerializer});
+//       } catch {}
+//     },//@ts-ignore
+//     track: ({ payload }) => {
+//       const { meta, properties, event } = payload;
+//       const offerId = window.localStorage.getItem('offerId');
+//       const uid = offerId !== null ? offerId : (payload.userId || payload.anonymousId);
+//       const eevent = { // e_c/a/n/v = category, action, name, value
+//         ...eventDets,
+//         'uid': uid,
+//         'url': window.location.href,
+//         'cdt': meta.ts,
+//         'e_c': event,
+//         'e_a': event,
+//         'e_n': properties.dashName,
+//         'e_v': properties.dashId
+//       };
+//       axios && axios.get(MURL, {params:eevent, paramsSerializer:paramsSerializer});
+//     },
+//   };
+//   myPlugins = [myPlugin, matomoPlugin];
+// }
 
 
 export const analytics = Analytics({ app: 'Pulse', debug:true, plugins: myPlugins })
@@ -120,7 +123,7 @@ axios.interceptors.response.use(function (response) {
   return response;
 }, function (error) {
   // Assumes any error is a login problem and redirects. Unless already attempting login.
-  if(error.response.status === 401 && !error.request.responseURL.endsWith("/login")) {
+  if(error.response && error.response.status === 401 && !error.request.responseURL.endsWith("/login")) {
     localStorage.removeItem("token");
     window.location.href = "/rlogout";
   } else {
@@ -130,14 +133,15 @@ axios.interceptors.response.use(function (response) {
 });
 
 export function getSubdomain() {
-  const ru = get(window,"pulseconfig.rootURL",undefined) as string;
+  const ru = get(window,"pulseconfig.rootURL",undefined) as unknown as string;
   if(ru !== undefined && typeof ru === "string") {
     const p = ru.indexOf("/");
     if(p > 0) {
       const afterHttp = ru.length > p && ru.charAt(p+1) === '/' ? ru.substring(p+2) : ru.substring(p+1);
       const q = afterHttp.indexOf("/");
       if(q > 0) {
-        return afterHttp.substring(q);
+        let pth = afterHttp.substring(q);
+        return pth.endsWith("/") ? pth.substring(0,pth.length-1) : pth;
       }
     }
   }
@@ -191,6 +195,11 @@ export default function App() {
               <Route path="/dash/:ignore/popout.html" element={<div />} />
               <Route path="/dash/history/:dashId/*" element={wrap(<RequireAuth><DashHistoryPage /></RequireAuth>, "dashboard", "page historypage")} />
               <Route path="/dash/reports/:dashId/*" element={wrap(<RequireAuth><DashReportPage /></RequireAuth>, "dashboard", "page reportpage")} />
+              
+              {/* Horrible copy-paste hack until optional parameters are supported https://github.com/remix-run/react-router/issues/9546 */}
+              <Route path="/dash/raw/:dashId" element={wrap(<RequireAuth><DashboardPageRaw rightOptions={rightOptions} /></RequireAuth>, "dashboard")} />
+              <Route path="/dash/raw/:dashId/:ignore/:versionId" element={wrap(<RequireAuth><DashboardPageRaw rightOptions={rightOptions} /></RequireAuth>, "dashboard")} />
+              
               <Route path="/dash/:dashId/:ignore/:versionId" element={<RequireAuth><DashboardPage rightOptions={rightOptions} /></RequireAuth>} />
               <Route path="/dash/:dashId/*" element={<RequireAuth><DashboardPage rightOptions={rightOptions} /></RequireAuth>} />
               <Route path="/connections" element={wrap(<RequireAuth><ConnectionsPage /></RequireAuth>, "connections", "page connectionpage")} />
@@ -200,6 +209,7 @@ export default function App() {
               <Route path="/help/*" element={wrap(<HelpPage />)} />
               <Route path="/sqleditor" element={wrap(<RequireAuth><SqlEditorPage /></RequireAuth>, "sqleditor", "sqleditorpage")} />
               <Route path="/user" element={<RequireAuth>{wrap(<UserPage />)}</RequireAuth>} />
+              <Route path="/settings" element={<RequireAuth>{wrap(<SettingsPage />)}</RequireAuth>} />
               <Route path="/" element={wrap(<PageHome />, undefined, "homepage")} />
           </Routes>
           </ScrollToTop>
@@ -281,7 +291,8 @@ function PageHome() {
                 <Link to="/dash"><Button icon="dashboard" intent="success" large>Dashboards</Button></Link>
                 {/* eslint-disable-next-line react/jsx-no-target-blank */}
                 <a href="https://www.timestored.com/pulse/vid" target="_blank"><Button icon="video" intent="success" large>Video Tour</Button></a>
-                <Link to="/help/chart/timeseries"><Button icon="help" intent="primary" large>Documentation</Button></Link>
+                {/* eslint-disable-next-line react/jsx-no-target-blank */}
+                <a href="http://timestored.com/pulse/help/?utm_source=pulse&utm_medium=app&utm_campaign=pulse" target="_blank"><Button icon="help" intent="primary" large>Documentation</Button></a>
             </div>
           </div>
         </div>

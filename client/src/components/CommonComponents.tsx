@@ -3,7 +3,7 @@ import { Alignment, Navbar, NavbarGroup, NavbarHeading } from '@blueprintjs/core
 import React, { Component, FunctionComponent, ReactNode, SyntheticEvent, useCallback, useContext, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import _uniqueId from 'lodash-es/uniqueId';
-import { debounce } from "lodash-es";
+import { debounce, get } from "lodash-es";
 import { Link } from "react-router-dom";
 import QueryEngine from "../engine/queryEngine";
 import { ServerConfig } from "./ConnectionsPage";
@@ -12,6 +12,8 @@ import { isAdmin, ThemeContext } from './../context';
 import { Popover2 } from "@blueprintjs/popover2";
 import { Logo } from "../App";
 import { FallbackProps } from "../ErrorBoundary";
+import { TimezoneSelect } from "@blueprintjs/datetime2";
+import useLocalStorage from "./hooks";
 
 
 
@@ -38,7 +40,7 @@ export const MyNavBar: FunctionComponent<{ rightChildren?: React.ReactNode, chil
           <UserButton isAdmin={isAdmin(context)} username={context.login?.username} />
           {/* <Button icon="notifications" minimal title="You have no new notifications" /> */}
           {/* eslint-disable-next-line react/jsx-no-target-blank */}
-          <a href="http://timestored.com/pulse/help/?utm_source=pulse&utm_medium=app&utm_campaign=pulse" target="_blank"><Button icon="help" intent={isSel("help")} minimal /></a>
+          <HelpButton isAdmin={isAdmin(context)} />
         </NavbarGroup>
       </Navbar>
       </div>);
@@ -46,17 +48,39 @@ export const MyNavBar: FunctionComponent<{ rightChildren?: React.ReactNode, chil
 
   
 
+function HelpButton(props:{isAdmin:boolean}) {
+  const [menuShown, setMenuShown] = useState(false);
+  const version = get(window,"pulseconfig.version","unknown") as unknown as string;
+
+    return <Popover2 isOpen={menuShown} placement="bottom-end" onInteraction={(state)=>setMenuShown(state)}  interactionKind="hover" hoverOpenDelay={0}
+        content={
+        <Menu>
+          {/* eslint-disable-next-line react/jsx-no-target-blank */}
+          <a href="https://www.timestored.com/pulse/help/?utm_source=pulse&utm_medium=app&utm_campaign=pulse" target="_blank"><MenuItem icon="share"  text="Help" /></a>  {/* eslint-disable-next-line react/jsx-no-target-blank */}
+          <a href="https://www.timestored.com/contact/?subject=PulseHelp&details=Hi&utm_source=pulse&utm_medium=app&utm_campaign=pulse" target="_blank"><MenuItem icon="third-party"  text="Support" /></a> {/* eslint-disable-next-line react/jsx-no-target-blank */}
+          <a href="mailto:pulse-support@timestored.com" target="_blank"><MenuItem icon="envelope"  text="Email" /></a>  {/* eslint-disable-next-line react/jsx-no-target-blank */}
+          <a href="https://www.timestored.com/pulse/help/release-changes?utm_source=pulse&utm_medium=app&utm_campaign=pulse" target="_blank"><MenuItem text={"Version "+version} /></a>
+        </Menu>}>
+        <Button icon="help" minimal />
+      </Popover2>;
+}
+
+
+
 function UserButton(props:{username:string | undefined, isAdmin:boolean}) {
   const [menuShown, setMenuShown] = useState(false);
+  const [timezone, setTimezone] = useLocalStorage("timezone", Intl.DateTimeFormat().resolvedOptions().timeZone); // THis default and any other occurrences must be the same
   
   if(props.username) {
-      return <Popover2 isOpen={menuShown} placement="bottom" onInteraction={(state)=>setMenuShown(state)}  
+      return <Popover2 isOpen={menuShown} placement="bottom-end" onInteraction={(state)=>setMenuShown(state)}   interactionKind="hover" hoverOpenDelay={0}
           content={
           <Menu>
             <Link to="/rlogout"><MenuItem icon="log-out"  text="Log out" /> </Link>
             {props.isAdmin && <Link to="/user"><MenuItem icon="user"  text="Users" /></Link>}
+            {props.isAdmin && <Link to="/settings"><MenuItem icon="cog"  text="Settings" /></Link>}
+            <TimezoneSelect value={timezone} onChange={tz=>setTimezone(tz)} showLocalTimezone />
           </Menu>}>
-          <Button icon="user" minimal onClick={()=>setMenuShown(true)}>{props.username}</Button>
+          <Button icon="user" minimal >{props.username}</Button>
         </Popover2>;
   }
   return <Link to="/rlogin"><Button icon="log-in" minimal>Login</Button></Link>;
@@ -168,9 +192,9 @@ export function getDefaultErrorFallback(message:ReactNode | string | undefined =
       );
 }
 
-type sitepage = "/help/forms" | "/help" | "/help/chart";
+type sitepage = "help/forms" | "help" | "help/chart" | "help/dynamic-html";
 export function MyHelpLink(props: { htmlTxt: string, href: sitepage }) {
-  return <HelpLink htmlTxt={props.htmlTxt} href={props.href} />;
+  return <HelpLink htmlTxt={props.htmlTxt} href={"https://www.timestored.com/pulse/" + props.href} />;
 }
 
 export function HelpLink(props: { htmlTxt: string, href: string }) {

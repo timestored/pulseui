@@ -1,5 +1,6 @@
 import { Button, Card, Elevation, H3, Label } from "@blueprintjs/core";
 import axios from "axios";
+import { get } from "lodash-es";
 import React, { useContext } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { Logo } from "./App";
@@ -8,7 +9,9 @@ import { SERVER } from "./engine/queryEngine";
 
    
 export async function signin(username: string, password:string, callback: (lr:undefined | LoginResponse) => void) {
-  await axios.post<LoginResponse>(SERVER + "/login",{username, password})
+  // Everything in micronaut moved under /api/ to prevent collisions. But /login/logout was too hard to move.
+  // hence rlogin/rlogout is the react page. And the ../ to make it work.
+  await axios.post<LoginResponse>(SERVER + "/../login",{username, password}) 
   .then((d) => { // @ts-ignore
     callback(d.data);
   }).catch((e) =>{
@@ -18,32 +21,50 @@ export async function signin(username: string, password:string, callback: (lr:un
   callback(undefined);
 };
 
-  
-  export function LoginPage(props:{logincallBack:(lr:LoginResponse) => void}) {
+
+export function LoginPage(props:{logincallBack:(lr:LoginResponse) => void}) {
     let navigate = useNavigate();
     let location = useLocation();
     const themeContext = useContext(ThemeContext);
 
     // @ts-ignore
-    let from = location.state?.from?.pathname || "/"; // @ts-ignore
+    let from = location.state?.from?.pathname || "/dash"; // @ts-ignore
     let search = location.state?.from?.search || ""; 
       
 	// Allows login via args in URL to that screenshotting can work.
     let sp = new URLSearchParams(search);
+    if(sp.get("sd_offerId") !== null) {
+      window.localStorage.setItem('offerId', sp.get("sd_offerId")!);
+    }
     if(sp.get("sd_u") !== null && sp.get("sd_p") !== null) {
-        let u = sp.get("sd_u");
-        let p = sp.get("sd_p");
-        signin(u!, p!, lr => { lr !== undefined && props.logincallBack(lr); });
-        console.error("SIGNIN!");
-        let hr = window.location.href;
-        if(hr.indexOf("?") !== -1) {
-          hr = hr.substring(0,hr.indexOf("?"));
+        let u = sp.get("sd_u")!;
+        let p = sp.get("sd_p")!;
+        signin(u, p, lr => { 
+          lr !== undefined && props.logincallBack(lr); 
+          let hr = window.location.href;
+          if(hr.indexOf("?") !== -1) {
+            hr = hr.substring(0,hr.indexOf("?"));
+          }
+          sp.delete("sd_u");
+          sp.delete("sd_p");
+          navigate(from + "?" + sp.toString(), { replace: true });
+        });
+    } else {
+        if(get(window,"pulseconfig.isAuthProxy",false)) {
+          // post to autologin
+          signin("fakeusername-usingproxy", "fakepass-usingproxy", lr => { 
+            lr !== undefined && props.logincallBack(lr); 
+            navigate(from, { replace: true });
+          });
         }
-        sp.delete("sd_u");
-        sp.delete("sd_p");
-        // window.location.href = hr + sp.toString();
-        console.error("REDIR!");
-        navigate(from + sp.toString(), { replace: true });
+        
+        if(get(window,"pulseconfig.isDemo",true)) {
+          // Autologin for demo purposes
+          signin("admin", "pass", lr => { 
+            lr !== undefined && props.logincallBack(lr); 
+            navigate(from, { replace: true });
+          });
+        }
     }
   
     function handleSubmit(event: React.FormEvent<HTMLFormElement>) {

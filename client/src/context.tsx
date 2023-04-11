@@ -7,7 +7,7 @@ import { LoginResponse } from "./auth";
 export const desktop = new desktopModel("foo");
 export const WorkspaceContext = React.createContext({ desktop: desktop, selectedNode: "" });
 export const notyf = new Notyf({types:[{type:"info", className:"infoNotyfy", background:"transparent", icon:{}}]});
-export const isDEV = true;
+export const isDEV = false;
 
 
 export type ThemeType = "light" | "dark";

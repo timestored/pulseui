@@ -23,7 +23,7 @@ function ScreenSelector() {
   const [imgState, setImgState] = useState<{gs:grabState, src:string | undefined}>({gs:"unsent",src:undefined});
 
   function generateURL():string {
-    return "/gimg/dash?url=" + encodeURIComponent(url) + "&height=" + height + "&width=" + width + "&delay=" + delay + "000";
+    return "/api/gimg/dash?url=" + encodeURIComponent(url) + "&height=" + height + "&width=" + width + "&delay=" + delay + "000";
   }
   
 
@@ -52,7 +52,7 @@ function ScreenSelector() {
             <input type="text" value={window.location.host + imgState.src}  width="60" style={{width:"50em"}} />
             <br />
             <span style={{display:"inline-block"}}>
-              <img src={SERVER + imgState.src} alt="Screenshot of URL" onLoad={() => setImgState({gs:"returned", src:imgState.src})} style={{border:"1px solid grey", margin:"3px", maxWidth:"80%"}} />
+              <img src={SERVER + '../' + imgState.src} alt="Screenshot of URL" onLoad={() => setImgState({gs:"returned", src:imgState.src})} style={{border:"1px solid grey", margin:"3px", maxWidth:"80%"}} />
             </span>
           </div>}
     </form>

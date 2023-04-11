@@ -1,5 +1,5 @@
-import React, { Component, Suspense, useState } from 'react';
-import QueryEngine, { getSensibleServerIdx, Queryable, UpdatingQueryable, UpdatingQueryableListener } from '../engine/queryEngine';
+import React, { Component, MouseEventHandler, Suspense, useEffect, useState } from 'react';
+import QueryEngine, { getSensibleServer, Queryable, SetArgsType, UpdatingQueryable, UpdatingQueryableListener } from '../engine/queryEngine';
 import { MyHelpLink, MyModal, getDefaultErrorFallback } from './CommonComponents';
 import { Col, DataTypes, SmartRs } from '../engine/chartResultSet';
 import ReactECharts from '../echarts-for-react';
@@ -11,9 +11,9 @@ import { ExampleTestCases } from '../engine/ViewStrategy';
 import { DataZoomComponentOption, EChartsOption, graphic, PieSeriesOption, SeriesOption, TitleComponentOption } from 'echarts';
 import { Link } from 'react-router-dom';
 import 'jsonic';
-import { clone, get, merge, set } from "lodash-es";
+import { cloneDeep, get, merge, mergeWith, set } from "lodash-es";
 import { IThemeType, ThemeContext, ThemeType } from '../context';
-import { SFormatters } from './AGrid';
+import SFormatters from './SFormatters';
 // Think echarts is needed for theme import
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import echarts from 'echarts';
@@ -21,15 +21,18 @@ import "./customed.js";
 import { ItemRenderer, Select2 } from '@blueprintjs/select';
 import { TbChartBubble, TbChartCandle, TbChartRadar, TbCone } from 'react-icons/tb';
 import { AiOutlineBoxPlot } from 'react-icons/ai';
+import _uniqueId from 'lodash-es/uniqueId';
 
 import { ErrorBoundary } from '../ErrorBoundary';
 import { SubConfigEditor } from './SubConfigEditor';
+import { GridConfig } from './AGrid';
+import { ActionHandler,runActions } from '../engine/actionHandlers';
 const ESurface = React.lazy(() => import('./3DChartFactory'));
 const AGrid = React.lazy(() => import('./AGrid'));
 
 export const chartTypes = ["grid", 'timeseries', 'area', 'line', "bar", "stack", "bar_horizontal", "stack_horizontal", "pie",
     "scatter", "bubble", "candle", "radar", "treemap", "heatmap", "calendar", "boxplot", "3dsurface", "3dbar",
-    "sunburst", "tree"] as const;
+    "sunburst", "tree", "metrics"] as const;
 export type ChartType = typeof chartTypes[number]; 
 
 
@@ -51,6 +54,7 @@ export function getChartIcon(ct:ChartType):JSX.Element|IconName  {
         case "grid": return "th";
         case "treemap": return "diagram-tree";
         case "heatmap": return "heatmap";
+        case "metrics": return "array-numeric";
         case "boxplot": return <AiOutlineBoxPlot />;
         case "sunburst": return "flash";
         case "3dsurface": return <TbCone />;
@@ -99,14 +103,32 @@ interface MyUpdatingChartState {
 
 // SubConfig is all the config for "Charts" where Charts actually includes AGrid.
 // overrideJson - Is generic JSON editing in exact same shape as echarts - so override is merge
-// colFormats - Are our specific formatters
-// seriesSettings - Is the SeriesOption from echarts but stored by columnName key. Meaning we don't need to know mapping.
-export type SubConfig = {overrideJson:EChartsOption, colConfig:ColConfig};
-export const getEmptySubConfig = ():SubConfig => { return {overrideJson:{}, colConfig:{}}; };
-export type ColConfig = {[k:string]:SeriesOption & {colFormat?:ColFormat}};
-export type ColFormat = ""|"NUMBER0"|"NUMBER1"|"NUMBER2"|"NUMBER3"|"NUMBER4"|"NUMBER5"|"NUMBER6"|"NUMBER7"|"NUMBER8"|"NUMBER9"|"PERCENT0"|"PERCENT1"|"PERCENT2"
-  |"CURUSD"|"CUREUR"|"CURGBP"|"TAG"|"HTML";
+// colConfig = ColName => {seriesSettings, colFormat, colWidth, axisChoice } - Per column settings
+//              seriesSettings - Is the SeriesOption from echarts but stored by columnName key. Meaning we don't need to know mapping.
+// gridConfig - Grid specific configuration
+// bug? - colConfig contains chart and grid specific settings, bad idea?
+// bug? - gridConfig is always defined and stored. the UI toggles between true/false. Whereas overrideJson is optional tristate - true/false/default. Confusing.
+export type SubConfig = { 
+    overrideJson:EChartsOption, 
+    colConfig:ColConfig, 
+    gridConfig:DeepPartial<GridConfig>, 
+    interactiveConfig:InteractiveConfig,
+    actionHandlers:ActionHandler[],
+};
 
+export type DeepPartial<T> = { [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P]; };
+
+export const getEmptySubConfig = ():SubConfig => { return {overrideJson:{}, colConfig:{}, gridConfig:{}, interactiveConfig:{}, actionHandlers:[]}; };
+export type AxisChoice = "leftax"|"rightax";
+export type ColumnConfig = SeriesOption & {colFormat?:ColFormat, colWidth?:number, axisChoice?:AxisChoice};
+export type ColConfig = {[k:string]:ColumnConfig};
+export type InteractiveConfig = {enabled?:boolean, wkeyName?:string};
+
+
+// NUMBER3P - P = Plain - i.e. without commas
+export type ColFormat = ""|"NUMBER0" |"NUMBER1" |"NUMBER2" |"NUMBER3" |"NUMBER4" |"NUMBER5" |"NUMBER6" |"NUMBER7" |"NUMBER8" |"NUMBER9"
+                          |"NUMBER0P"|"NUMBER1P"|"NUMBER2P"|"NUMBER3P"|"NUMBER4P"|"NUMBER5P"|"NUMBER6P"|"NUMBER7P"|"NUMBER8P"|"NUMBER9P" // P = Plain i.e. no commas
+    |"PERCENT0"|"PERCENT1"|"PERCENT2"|"CURUSD"|"CUREUR"|"CURGBP"|"TAG"|"HTML"|"SPARKLINE"|"SPARKBAR"|"SPARKDISCRETE"|"SPARKBULLET"|"SPARKPIE"|"SPARKBOXPLOT";
 
 export function ChartForm(props:{ onItemSelect:(ct:ChartType)=>void, chartType:ChartType }) {
     const [ lastCT, setLastCT ] = useState<ChartType>(props.chartType === "grid" ? "area" : props.chartType);
@@ -127,9 +149,11 @@ export function ChartForm(props:{ onItemSelect:(ct:ChartType)=>void, chartType:C
                 }} >
                 <Button small icon={getChartIcon(props.chartType)} text={props.chartType} rightIcon="caret-down" />
             </ChartSelect>
-            <MyHelpLink href="/help/chart" htmlTxt="Click link to see full demos of all display options" />
+            <MyHelpLink href="help/chart" htmlTxt="Click link to see full demos of all display options" />
         </>;
 }
+
+export type ActionRunner = (actionHandlers:ActionHandler[], argMapWithTypes: { [argKey: string]: any }) => void;
 
 export class MyUpdatingChart extends Component<MyChartProps, MyUpdatingChartState> implements UpdatingQueryableListener {
     state: MyUpdatingChartState = {
@@ -168,8 +192,7 @@ export class MyUpdatingChart extends Component<MyChartProps, MyUpdatingChartStat
 
         let qb = config?.dashstate?.queryable;
         if(qb === undefined) {
-            let serverIdx = getSensibleServerIdx(props.serverConfigs);
-            let serverConfig = serverIdx === undefined ? undefined : props.serverConfigs[serverIdx];
+            let serverConfig = getSensibleServer(props.serverConfigs);
             qb = getDemoQueryable(serverConfig, props.chartType);
         }
 
@@ -181,7 +204,8 @@ export class MyUpdatingChart extends Component<MyChartProps, MyUpdatingChartStat
         // Then load in the saved overrides
         let ds = config.dashstate ?? {};
         let oldFix = Object.keys(ds).includes("chartType") ? { chartType:this.remapOldChartTypes(ds['chartType'])} : {};
-        const s = { ...this.state, ...props, ...ds, ...oldFix };
+        // merging subCOnfig in case loading an old subConfig that is missing keys
+        let s = { ...this.state, ...props, ...ds, ...oldFix, subConfig:merge(getEmptySubConfig(),ds.subConfig ?? {}) };
         this.state = { ...s, lastNongridChartType:s.chartType === "grid" ? "area" : s.chartType};
     }
 
@@ -196,39 +220,70 @@ export class MyUpdatingChart extends Component<MyChartProps, MyUpdatingChartStat
 
     render() {
         const { srs, exception, chartType, subConfig } = this.state;
+        const setArgsWithType:SetArgsType = (argMapWithTypes: { [argKey: string]: any }) => {
+            let iConfig = this.state.subConfig.interactiveConfig;
+            if(iConfig.enabled !== false) {
+                let pre = iConfig.wkeyName ?? '';
+                pre = pre.replace(/[^0-9a-zA-Z_]/gi, '').replaceAll(" ","_"); // alphanumeric only
+                let nObj:{ [argKey: string]: any } = {};
+                for (var key in argMapWithTypes) {
+                    
+                    nObj[(pre.trim().length === 0 ? "" : pre + ".") + key] = argMapWithTypes[key];
+                }
+                this.props.queryEngine.setArgsWithType(nObj);
+            }
+        }
+        const actionRunner:ActionRunner = (actionHandlers, argMapWithTypes) => {
+            runActions(this.props.queryEngine, actionHandlers, argMapWithTypes);
+        }
 
         let Display: JSX.Element | null = <div>Error!</div>;
 
         try {
             Display = srs === undefined ? null :
                 exception ?
-                <NonIdealState icon="error" title="Error Generating Visualization" description={exception}
-                    action={<div>Try changing a query setting in the editor</div>} />
-                : MyUpdatingChart.getChart(chartType, srs, this.context.theme, subConfig, this.onConfigChange, this.state.myKey);
+                    exception.includes("Awaiting Submit.") ? 
+                        <NonIdealState icon="confirm" title="Awaiting Submit" description={""} action={<div>There should be a form on this dashboard. <br />Try completing the form and pressing submit.</div>} />
+                        : <NonIdealState icon="error" title="Error Generating Visualization" description={exception} action={<div>Try changing a query setting in the editor</div>} />
+                : MyUpdatingChart.getChart(chartType, srs, this.context.theme, subConfig, setArgsWithType, this.onConfigChange, this.state.myKey, actionRunner);
         } catch (error) {
             console.error(error);
         }
-        const allowsSubconfig = ['timeseries', 'area', 'line', "bar", "stack", "bar_horizontal", "stack_horizontal", "scatter", "bubble", "grid",
-                // "pie",  "candle", "radar", "treemap", "heatmap", "calendar", "boxplot", "3dsurface", "3dbar","sunburst", "tree"
+        const allowsSubconfig = ['timeseries', 'area', 'line', "bar", "stack", "bar_horizontal", "stack_horizontal", "scatter", "bubble", "grid","metrics"
+                // "pie",  "candle", "radar", "treemap", "heatmap", "calendar", "boxplot", "3dsurface", "3dbar","sunburst", "tree", 
                 ].includes(chartType);
+
+        let Editor: JSX.Element | null = <div>Error!</div>;
+        try {
+            Editor = <>{this.uQueryable.getEditor(<ChartForm chartType={chartType} onItemSelect={ct => { this.setState({ chartType: ct})}} />)}
+                    {allowsSubconfig && <SubConfigEditor subConfig={subConfig} srs={srs} chartType={chartType} serverConfigs={this.props.serverConfigs}
+                            onChange={(s,forceRefresh) => { 
+                                // Some changes to charts etc. can only be done by hard refreshing and regnerating the entire chart.
+                                this.setState({subConfig:s, myKey:this.state.myKey + (forceRefresh ? 1 : 0)}); 
+                            }} />}
+                </>;
+        } catch (error) {
+            console.error(error);
+        }
+        const tabTitle = this.props.tabNode.getName() || (this.props.chartType === "grid" ? "Grid" : "Chart");
 
         return <ChartWrapper>
             <ErrorBoundary  resetKeys={[chartType]} FallbackComponent={getDefaultErrorFallback("Error displaying this chart. Try changing chart type.")} >{Display}</ErrorBoundary>
-            {this.props.selected &&
-                <MyModal title="MyEditor:" isOpen={true} handleClose={this.props.clearSelected}>
-                    {this.uQueryable.getEditor(<ChartForm chartType={chartType} onItemSelect={ct => { this.setState({ chartType: ct})}} />)}
-                    {allowsSubconfig && <SubConfigEditor subConfig={subConfig} srs={srs} isGrid={chartType==="grid"}
-                            onChange={(s,forceRefresh) => { this.setState({subConfig:s, myKey:this.state.myKey + (forceRefresh ? 1 : 0)}); }} />}
+            {this.props.selected && <MyModal title={tabTitle} isOpen={true} handleClose={this.props.clearSelected}>
+                    <ErrorBoundary  resetKeys={[chartType]} FallbackComponent={getDefaultErrorFallback("Error displaying editor. Raw json may be corrupt.")} >
+                    {Editor}
+                </ErrorBoundary>
                 </MyModal>}
         </ChartWrapper>;
     }
 
-    public static getChart(ct: ChartType, srs: SmartRs, theme: ThemeType = "light", subConfig?:SubConfig, onConfigChange:(s:SubConfig)=>void = ()=>{}, myKey?:number): JSX.Element | null {
+    public static getChart(ct: ChartType, srs: SmartRs, theme: ThemeType = "light", subConfig?:SubConfig, 
+        setArgTyped:SetArgsType=()=>{} , onConfigChange:(s:SubConfig)=>void = ()=>{}, myKey?:number, actionRunner:ActionRunner=()=>{}): JSX.Element | null {
         if(ct === undefined) {
             return null;
         }
         const sc = subConfig === undefined ? getEmptySubConfig() : subConfig;
-        const args = {  srs:srs, subConfig:sc, key:myKey, theme:theme  };
+        const args = {  srs:srs, subConfig:sc, key:myKey, theme:theme, setArgTyped, actionRunner  };
 
         switch (ct) {
             case "area":
@@ -248,6 +303,7 @@ export class MyUpdatingChart extends Component<MyChartProps, MyUpdatingChartStat
             case "timeseries": return <ETimeSeries {...args} />;
             case "treemap": return <ETreeMap {...args} />;
             case "heatmap": return <EHeatMap {...args} />;
+            case "metrics": return <EMetrics {...args} />;
             case "boxplot": return <EBoxPlot {...args}/>;
             case "sunburst": 
             case "tree":
@@ -260,15 +316,36 @@ export class MyUpdatingChart extends Component<MyChartProps, MyUpdatingChartStat
 }
 
 
+function performClick(props:EChartProps, name:string, series:string, val:string, ts?:string) { 
+    const args = { name, series, val }
+    props.setArgTyped(args); 
+    props.actionRunner(props.subConfig.actionHandlers.filter(a => a.trigger === "Click"), args);
+}
+
+function getClickHandler(c:Component<EChartProps>):Record<string,Function> { 
+    return {
+        click: (e:any) => { 
+            const series = (e.seriesName && !e.seriesName.includes("series")) ? e.seriesName : '';
+            const val = (e.value && typeof e.value === "number") ? e.value : '';
+            performClick(c.props, e.name ?? '', series, val);
+        },
+        // contextmenu: (e:any) => {  alert("contextty"); e.preventDefault(); e.stopPropogation(); },
+      };
+}
+
+
 const DEF_GRID = { left: 0, top: 10, right: 10, bottom: 0,containLabel: true };
 
 // Without replaceMerge - removing an existing key, i.e. resetting a default such as background color would NOT take effect.
 // However notMerge causes a full redraw on all new data. So we need to specify which entries may have keys reset AND
 // let eCharts know to always fully replace those parts.
 const REP = ["grid","title","axisPointer","xAxis","yAxis"]; // Legend not included else it means you can't toggle the legend showing
-type EChartProps = {  srs: SmartRs, subConfig:SubConfig, theme: ThemeType };
+type EChartProps = {  srs: SmartRs, subConfig:SubConfig, theme: ThemeType, setArgTyped:SetArgsType, actionRunner:ActionRunner };
 
 class EPie extends Component<EChartProps> {
+    
+    onEvents: Record<string,Function> = getClickHandler(this);
+    
     render() {
         const { srs, theme } = this.props;
         let s = needs({srs:this.props.srs, needsNumbers:1});
@@ -282,7 +359,7 @@ class EPie extends Component<EChartProps> {
                             Pie Chart with &gt; 200 segments makes little sense.
                             <br />We recommend merging some of the segments into groups.
                         </NonIdealState>
-                        : <ReactECharts key={srs.chartRS.numericColumns.length} option={myOptions} theme={getThmT(theme)} replaceMerge={REP} />}
+                        : <ReactECharts key={srs.chartRS.numericColumns.length} option={myOptions} theme={getThmT(theme)} replaceMerge={REP} onEvents={this.onEvents} />}
                 </>;
         } catch {
             return <ChartHelp chartType="pie" />
@@ -299,6 +376,7 @@ function toPieOption(srs: SmartRs, theme: ThemeType): EChartsOption {
 
     function toSeries(nc:Col<number>, overrides:PieSeriesOption):PieSeriesOption {
         return {
+            name:nc.name,
             type: 'pie', label: { position: 'inside' },
             tooltip:{ valueFormatter:getTooltipFormatter(nc.name, srs.rsdata.tbl.types[nc.name]),},
             data: srs.chartRS.rowLabels.map((lbl, idx) => {
@@ -316,7 +394,7 @@ function toPieOption(srs: SmartRs, theme: ThemeType): EChartsOption {
         s = [toSeries(ncs[0], { radius: '45%', center: ['25%', '50%']}), toSeries(ncs[1], { radius: '45%', center: ['75%', '50%']})];
         t = [{text:ncs[0].name, top:"15%", left:"21%"},{text:ncs[1].name, top:"15%", left:"51%"}];
     } else if(ncs.length > 2) {
-        const s1 = toSeries(ncs[0], { radius: '39%', center: ['25%', '30%'], name:"asd"});
+        const s1 = toSeries(ncs[0], { radius: '39%', center: ['25%', '30%']});
         const s2 = toSeries(ncs[1], { radius: '39%', center: ['75%', '30%']});
         const s3 = toSeries(ncs[2], { radius: '39%', center: ['25%', '75%']});
         s = ncs.length === 3 ? [s1,s2,s3] : [s1,s2,s3,toSeries(ncs[2], { radius: '40%', center: ['75%', '75%']})];
@@ -376,6 +454,111 @@ class EHeatMap extends Component<EChartProps> {
         }
     }
 }
+
+
+
+const  SparkSpan = (props:{
+    onClick: MouseEventHandler<HTMLDivElement> | undefined, name:string, sparkType:"line"|"bar", latestVal:string, vals:number[], id:string,
+    itemColor?:string, areaColor?:string, lineColor?:string}) => {
+
+    const {name, id, sparkType, vals, itemColor, lineColor, areaColor, latestVal} = props;
+
+    useEffect(() => {
+        const hw = {height:'75px', width:'151px'};
+        if(sparkType === "bar") {
+            const barWidth = Math.floor(150/(vals.length ?? 1)) - 1;
+            //@ts-ignore
+            $(id).sparkline('html', {type: 'bar', ...hw, barWidth:barWidth + 'px', barColor: itemColor} ); 
+        } else { //@ts-ignore
+            $(id).sparkline('html', {type: 'line', ...hw,  lineColor: lineColor, fillColor: areaColor } );
+        }
+    }, [id, sparkType, vals, itemColor, lineColor, areaColor]);
+
+    const vst = vals.join(",");
+    return <div key={name} className="lat-container" onClick={props.onClick}>
+    <div className="lat-box"> <div className={"lat-spacer lat-spacer-" + sparkType} ></div>   
+        <div className="lat-chart" dangerouslySetInnerHTML={{__html: "<span id='" + id + "' values='" + vst + "'></span>"}}></div> 
+    </div>
+    <div className="lat-box lat-overlay"> <h2>{name}</h2> <h1>{latestVal}</h1> </div>
+</div>;
+}
+
+/** Draw MEtric Panel for each column. Mostly to show key KPIs so only show latest value. */
+class EMetrics extends Component<EChartProps> {
+    private myOptions:EChartsOption = {};
+    private id:string;
+
+    constructor(props:EChartProps) {
+        super(props);
+        this.id = _uniqueId("prefix-");
+    }
+    
+    render() {
+        const { srs } = this.props;
+        let s = needs({srs:this.props.srs, needsNumbers:1});
+        if(s !== null) { 
+            return <ChartHelp chartType="metrics" reason={s} /> 
+        }
+
+        try {
+            // TODO support non-numeric columns. Support sd_bg/fg?
+            // Fake the options and perform merge to get tooltip formatter AND name override.
+            const fakeOptions = {series:srs.chartRS.numericColumns.map(nc => {return {name:nc.name, oname:nc.name, data:nc.vals}})};
+            this.myOptions = carefulOverride(fakeOptions, this.props.subConfig);
+
+            if(srs.count() > 100) {
+                return <NonIdealState icon="error" title="Too Many Rows" >Metrics &gt; 100 rows is not reasonably displayable.</NonIdealState>;
+            } else if(srs.count() < 1) {
+                return <NonIdealState icon="error" title="Data has zero rows." >Metrics with 0 rows is not displayable.</NonIdealState>;
+            }
+            return <div className='lat-outer' id={this.id}>
+                {this.myOptions.series && (this.myOptions.series as SeriesOption[]).map((sery,idx) => {
+                    // @ts-ignore - Assuming latest at bottom as that's currently required for time-series chart speed
+                    let latestVal:string = sery.data && sery.data[sery.data.length-1]; 
+                    if(sery?.tooltip?.valueFormatter) { 
+                        latestVal = sery!.tooltip.valueFormatter(latestVal);
+                    } else {
+                        latestVal = getTooltipFormatter("","number")(latestVal);
+                    }
+
+                    const oName = srs.chartRS.numericColumns[idx].name;
+                    const cc = this.props.subConfig.colConfig;
+                    const itemColor = get(cc, oName + ".itemStyle.color","green") as string; // These defaults should agree with sparklines in table
+                    const areaColor = get(cc, oName + ".areaStyle.color",'#102040') as string;
+                    const lineColor = get(cc, oName + ".lineStyle.color",'#2C92B6') as string;
+                    const args = {itemColor,areaColor, lineColor, latestVal };
+                    
+                    return <SparkSpan name={"" + sery.name} vals={sery.data as number[]} id={this.id + "-" + idx}  {...{...args}} 
+                                    sparkType={sery.type === "bar" ? "bar" : "line"} onClick={()=>{ performClick(this.props, "" + sery.name, "latest", latestVal) }} />; 
+                })}
+            </div>;
+        } catch {
+            return <ChartHelp chartType="metrics"  />
+        }
+    }
+
+    componentDidUpdate() {
+        const hw = {height:'75px', width:'151px'};
+        this.props.srs.chartRS.numericColumns.forEach((nc,idx) => {
+            const eId = "#" + this.id + "-" + idx; // id tallies with the aboce id generation in span
+             // this relies on series/numericColumns mapping 1 to 1. AND only nc is the original name.(in case of user column renaming)
+            const sery = (this.myOptions.series as SeriesOption[])[idx];
+            const itemColor = get(this.props.subConfig.colConfig,nc.name + ".itemStyle.color","green"); // These defaults should agree with sparklines in table
+            const areaColor = get(this.props.subConfig.colConfig,nc.name + ".areaStyle.color",'#102040');
+            const lineColor = get(this.props.subConfig.colConfig,nc.name + ".lineStyle.color",'#2C92B6');
+            
+            if(sery.type === "bar") {
+                const barWidth = Math.floor(150/(sery.data?.length ?? 1)) - 1;
+                //@ts-ignore
+                $(eId).sparkline('html', {type: 'bar', ...hw, barWidth:barWidth + 'px', barColor: itemColor} ); 
+            } else { //@ts-ignore
+                $(eId).sparkline('html', {type: 'line', ...hw,  lineColor: lineColor, fillColor: areaColor } );
+            }
+        })
+      
+    }
+}
+
 
 class ETreeMap extends Component<EChartProps> {
     static contextType?: React.Context<any> | undefined = ThemeContext;
@@ -446,9 +629,12 @@ class ETreeMap extends Component<EChartProps> {
 }
 
 
+
 class EChart extends Component<EChartProps & { chartType:ChartType }> {
     static contextType?: React.Context<any> | undefined = ThemeContext;
     context!: React.ContextType<typeof ThemeContext>;
+    
+    onEvents: Record<string,Function> = getClickHandler(this);
 
     render() {
         const { srs, chartType } = this.props;
@@ -468,7 +654,8 @@ class EChart extends Component<EChartProps & { chartType:ChartType }> {
             nameRotate: isHorizontal ? undefined : 90,
             axisLabel: isHorizontal ? {} : { rotate: 45 }
         };
-        const myYAxis = { type:'value', name: nc.length === 1 ? nc[0].name : undefined };
+        const myYAxis = [{ type:'value', name: nc.length === 1 ? nc[0].name : undefined, scale:true, alignTicks:true },
+                         { type:'value', name: nc.length === 1 ? nc[0].name : undefined, scale:true, alignTicks:true }];
 
         try {
             const options: EChartsOption = {
@@ -490,9 +677,9 @@ class EChart extends Component<EChartProps & { chartType:ChartType }> {
                     return sery;
                 }),
             }
-            
-            let myOptions:EChartsOption = carefulOverride(options,this.props.subConfig);
-            return <ReactECharts option={myOptions} theme={getThm(this.context)} replaceMerge={REP} />;
+
+            let myOptions:EChartsOption = carefulOverride(options,this.props.subConfig, isHorizontal);
+            return <ReactECharts option={myOptions} theme={getThm(this.context)} replaceMerge={REP}   onEvents={this.onEvents}/>;
         } catch {
             return <ChartHelp chartType={chartType} />
         }
@@ -504,6 +691,13 @@ class EChart extends Component<EChartProps & { chartType:ChartType }> {
 class EScatter extends Component<EChartProps & {etype: "scatter" | "bubble" }> {
     static contextType?: React.Context<any> | undefined = ThemeContext;
     context!: React.ContextType<typeof ThemeContext>;
+    onEvents: Record<string,Function> = {
+        click: (e:any) => {
+            if(e.seriesName && e.value && Array.isArray(e.value) && e.value.length >= 3) {
+                performClick(this.props, e.value[2] ?? '', e.seriesName ?? '', e.value[0] ?? undefined); 
+            }
+        },
+      }
     render() {
         const { srs, etype } = this.props;
         if(this.props.srs.chartRS.numericColumns.length <= 0) { return <ChartHelp chartType={etype} reason="No numeric column found" /> }
@@ -562,7 +756,7 @@ class EScatter extends Component<EChartProps & {etype: "scatter" | "bubble" }> {
                 }),
             }
             let myOptions:EChartsOption = carefulOverride(options,this.props.subConfig);
-            return <ReactECharts option={myOptions} theme={getThm(this.context)} replaceMerge={REP} />;
+            return <ReactECharts option={myOptions} theme={getThm(this.context)} replaceMerge={REP} onEvents={this.onEvents} />;
         } catch {
             return <ChartHelp chartType={etype} />
         }
@@ -608,9 +802,18 @@ export function toCandleData(srs: SmartRs): CandleData {
     return { labels:labels, colh:data, volume:volCol };
 }
 
+
+
 class ECandleSeries extends Component<EChartProps> {
     static contextType?: React.Context<any> | undefined = ThemeContext;
     context!: React.ContextType<typeof ThemeContext>;
+    onEvents: Record<string,Function> = { click: (e:any) => { 
+        if(e.value && typeof e.value === "number") {
+            performClick(this.props, "candle", "volume", e.value ?? undefined, e.name ?? ''); 
+        } else {
+            performClick(this.props, "candle", "open", e.value[1] ?? undefined, e.name ?? ''); 
+        }
+        }, };
     render() {
         try {
             if(this.props.srs.chartRS.numericColumns.length <= 0) { return <ChartHelp chartType="candle" /> }
@@ -648,7 +851,7 @@ class ECandleSeries extends Component<EChartProps> {
             };
 
             let myOptions:EChartsOption = carefulOverride(canNOToption, this.props.subConfig);
-            return <ReactECharts option={myOptions} theme={getThm(this.context)} replaceMerge={REP} />;
+            return <ReactECharts option={myOptions} theme={getThm(this.context)} replaceMerge={REP} onEvents={this.onEvents}  />;
         } catch {
             return <ChartHelp chartType="candle" />
         }
@@ -690,6 +893,15 @@ class ECalendar extends Component<EChartProps> {
     // TODO THis context isn't updating on toggle
     static contextType?: React.Context<any> | undefined = ThemeContext;
     context!: React.ContextType<typeof ThemeContext>;
+    onEvents: Record<string,Function> =  {
+        click: (e:any) => { 
+            if(e.value && Array.isArray(e.value) && e.value.length >= 2) {
+                const series = (e.seriesName && !e.seriesName.includes("series")) ? e.seriesName : '';
+                performClick(this.props, e.name ?? '', series, e.value[1], e.value[0]);
+            }
+        }
+      };
+
     render() {
         let s = needs({srs:this.props.srs, needsNumbers:1, needsDates:true});
         if(s !== null) { 
@@ -713,7 +925,7 @@ class ECalendar extends Component<EChartProps> {
             const years = srs.chartRS.dateColumns[0].vals.map(d => d.getFullYear()).filter(onlyUnique).sort();
             const calendars = years.map((year,idx) => {return { range: ''+year, cellSize: ['auto', 20], top: 30+idx*200, left:100 }});
             const series = years.map((year,idx) => {
-                return { type: 'heatmap', coordinateSystem: 'calendar', calendarIndex: idx, data: getDataForYear(srs, year),}
+                return { type: 'heatmap', coordinateSystem: 'calendar', calendarIndex: idx, data: getDataForYear(srs, year), name:srs.chartRS.numericColumns[0].name}
             });
 
             let option:EChartsOption = {
@@ -724,7 +936,7 @@ class ECalendar extends Component<EChartProps> {
                 grid:DEF_GRID,
             };
             let myOptions:EChartsOption = carefulOverride(option, this.props.subConfig);
-            return <ReactECharts option={myOptions} theme={getThm(this.context)} replaceMerge={REP} />;
+            return <ReactECharts option={myOptions} theme={getThm(this.context)} replaceMerge={REP} onEvents={this.onEvents} />;
         } catch {
             return <ChartHelp chartType="calendar" /> 
         }
@@ -736,6 +948,13 @@ class ERadar extends Component<EChartProps> {
     // TODO THis context isn't updating on toggle
     static contextType?: React.Context<any> | undefined = ThemeContext;
     context!: React.ContextType<typeof ThemeContext>;
+    onEvents: Record<string,Function> = {
+        click: (e:any) => { 
+            if(e.name && e.value && Array.isArray(e.value) && e.value.length >= 1) {
+                this.props.setArgTyped({name:e.name ?? '', val:e.value[0] ?? undefined}); 
+            }
+        },
+      }
     render() {
         try {
             const srs = this.props.srs;
@@ -763,7 +982,7 @@ class ERadar extends Component<EChartProps> {
                     Radar with &gt; 500 rows, where each row is a color, does not make sense.
                     <br />We recommend merging some of the segments into groups.
                 </NonIdealState> 
-                : <ReactECharts option={myOptions} theme={getThm(this.context)} replaceMerge={REP} />}</>;
+                : <ReactECharts option={myOptions} theme={getThm(this.context)} replaceMerge={REP} onEvents={this.onEvents} />}</>;
         } catch {
             return <ChartHelp chartType="radar"  />;
         }
@@ -792,10 +1011,32 @@ function toNameSymbols(tnc: string[]): { name: string, sdname: string, sym: sym 
     });
 }
 
+function addTSclickHandler(echartRef:ReactECharts, setArgTyped:SetArgsType) {
+    if(echartRef) {        
+        const eChart = echartRef.getEchartsInstance();
+        const zr = eChart.getZr();
+        zr.on('click', (e:any) => { 
+            const pointInPixel = [e.offsetX, e.offsetY];
+            const pointInGrid = eChart.convertFromPixel('grid', pointInPixel);    
+            let r:{[k:string]:any} = {ts:new Date(pointInGrid[0]), val:pointInGrid[1]};
+            // If only showing one series, we can set it.
+            if(eChart.getOption().series) {
+                const s = eChart.getOption().series;
+                if(Array.isArray(s) && s.length === 1 && s[0].name && s[0].name.length > 0) {
+                    r['series'] = s[0].name;
+                }
+            }
+            setArgTyped(r);
+        }); 
+    }
+}
+
 class ETimeSeries extends Component<EChartProps> {
     static contextType?: React.Context<any> | undefined = ThemeContext;
     context!: React.ContextType<typeof ThemeContext>;
-    prevOverride:EChartsOption = {};
+    echartRef: ReactECharts | null = null;
+
+    componentDidMount() { if(this.echartRef) { addTSclickHandler(this.echartRef, this.props.setArgTyped); } }
 
     render() {
         try {
@@ -826,7 +1067,8 @@ class ETimeSeries extends Component<EChartProps> {
                     dimensions: headers,
                 },
                 xAxis: { type: 'time', splitLine: { show: true, lineStyle: { type: 'dashed' } }, },
-                yAxis: { scale: true, splitLine: { show: true, lineStyle: { type: 'dashed' } }, },
+                yAxis: [{ scale: true, splitLine: { show: true, lineStyle: { type: 'dashed' } }, alignTicks:true },
+                        { scale: true, splitLine: { show: true, lineStyle: { type: 'dashed' } }, alignTicks:true }],
                 series: tnc.map((tc, idx) => {
                     let isSymbol = nameSymbols[idx].sym !== "none";
                     hadSymbol = hadSymbol || isSymbol;
@@ -900,8 +1142,8 @@ class ETimeSeries extends Component<EChartProps> {
             }
 
             let latestOptions:EChartsOption = carefulOverride(options,this.props.subConfig);
-            return <ReactECharts option={latestOptions} theme={getThm(this.context)} 
-                            replaceMerge={REP}  />;
+            return <ReactECharts option={latestOptions} theme={getThm(this.context)}
+                            replaceMerge={REP} ref={(e) => { this.echartRef = e; }} />;
         } catch {
             return <ChartHelp chartType="timeseries" />;
         }
@@ -958,6 +1200,13 @@ class EBoxPlot extends Component<EChartProps> {
         return option; 
     }
     
+    onEvents: Record<string,Function> = {
+        click: (e:any) => { console.log(e);
+            if(e.name && e.value && Array.isArray(e.value) && e.value.length >= 3) {
+                performClick(this.props, e.name ?? '', 'average', e.value[2] ?? undefined);
+            }
+        },
+      }
 
     render() {
         const { srs, theme } = this.props;
@@ -967,7 +1216,7 @@ class EBoxPlot extends Component<EChartProps> {
         }
         try {
             let myOptions:EChartsOption = carefulOverride(this.toBoxPlotOption3(srs, theme), this.props.subConfig);
-            return <ReactECharts option={myOptions} theme={getThmT(theme)} replaceMerge={REP} />;
+            return <ReactECharts option={myOptions} theme={getThmT(theme)} replaceMerge={REP} onEvents={this.onEvents}/>;
         } catch {
             return <ChartHelp chartType="boxplot" />
         }
@@ -1006,7 +1255,7 @@ class ESunburst extends Component<EChartProps & { chartType:"sunburst"|"tree"}> 
         let option = {
             series: {
               type: chartType,
-              data: isTree ? [{name:"", children:data}] : data,
+              data: isTree ? [{name:ncs[0].name, children:data}] : data,
               radius: [0, '95%'],
               emphasis: { focus: 'ancestor' },
               tooltip: { trigger: 'item', ...getTooltipDefaults(theme), 
@@ -1018,6 +1267,8 @@ class ESunburst extends Component<EChartProps & { chartType:"sunburst"|"tree"}> 
         return option; 
     }
 
+    onEvents: Record<string,Function> = getClickHandler(this);
+
     render() {
         const { srs, theme, chartType } = this.props;
         let s = needs({srs:this.props.srs, needsNumbers:1});
@@ -1026,7 +1277,7 @@ class ESunburst extends Component<EChartProps & { chartType:"sunburst"|"tree"}> 
         }
         try {
             let myOptions:EChartsOption = carefulOverride(this.toSunburstOption(srs, theme, chartType), this.props.subConfig);
-            return <ReactECharts option={myOptions} theme={getThmT(theme)} replaceMerge={REP} />;
+            return <ReactECharts option={myOptions} theme={getThmT(theme)} replaceMerge={REP} onEvents={this.onEvents} />;
         } catch {
             return <ChartHelp chartType={chartType} />
         }
@@ -1123,6 +1374,12 @@ export function getChartHelp(): ChartTypeHelp[] {
         <li>The first numerical column will be taken as size.</li>
     </ul>;
 
+    const metricsFormatExplain = <ul>
+        <li>Each numerical column in the table becomes one panel in the metrics.</li>
+        <li>The latest value (bottom of table) is displayed prominently in large writing.</li>
+        <li>Optionally multiple rows will be used to create a shaded line/bar chart in the background.</li>
+    </ul>;
+
     const heatmapFormatExplain = <ul>
         <li>Each numerical column in the table becomes one column in the chart.</li>
         <li>The numerical values represent the shading within the chart.</li>
@@ -1161,6 +1418,7 @@ export function getChartHelp(): ChartTypeHelp[] {
     r.push(new ChartTypeHelpC("3dbar", "3D Bar Chart", ExampleTestCases.COUNTRY_STATS, surfaceFormatExplain));
     r.push(new ChartTypeHelpC("sunburst", "Sunburst", ExampleTestCases.COUNTRY_STATS, treeFormatExplain));
     r.push(new ChartTypeHelpC("tree", "Tree", ExampleTestCases.COUNTRY_STATS, treeFormatExplain));
+    r.push(new ChartTypeHelpC("metrics", "Metrics", ExampleTestCases.COUNTRY_STATS, metricsFormatExplain));
 
     
 
@@ -1218,6 +1476,7 @@ function getKdbDemoQueryable(ct: ChartType):string {
                 + "\n\t\t bid_SD_BG:50?`$(\"#FF6666\";\"\";\"\";\"\";\"\";\"\";\"\";\"\";\"\";\"\";\"\";\"\";\"\";\"#66FF66\");"
                 + "\n\t\t bid_SD_CODE:50?(\"0.xXXx\";\"0.XXx\";\"0.xxXX\");"
                 + "\n\t\t percent_SD_PERCENT0:50?1.0 )";
+        case "metrics":
         case "boxplot": return "([] gold:10?10; silver:til 10; crude:desc til 10; slick:13-til 10; copper:10?3; iron:10?8; diamond:4+10?8; rubber:6+10?10; lead:8+10?12)";
         case "sunburst": 
         case "tree":
@@ -1255,6 +1514,10 @@ export function getH2DemoQueryable(ct: ChartType):string {
                 + "\n\t `UPNL` AS UPNL_SD_CURUSD"
                 + "\nFROM TRADE ORDER BY TIME DESC LIMIT 300;";
         case "radar": return "select  name,mid,pnl,quantity,marketvalue,mid  From position ORDER BY quantity DESC,pnl desc LIMIT 8;";
+        case "metrics": 
+        return "select 2+rand()*open AS gold, 4+rand()*2*high AS silver,2+rand()*1.5*low as crude, 2.2+rand()*3*close AS slick,"
+            + "\n\t 1.5+rand()*open AS copper"
+            + "\n\t from candle ORDER BY time asc LIMIT 15;";
         case "boxplot": 
             return "select 2+rand()*open AS gold, 4+rand()*2*high AS silver,2+rand()*1.5*low as crude, 2.2+rand()*3*close AS slick,"
             + "\n\t 1.5+rand()*open AS copper,1+rand()*2*high AS iron,4+rand()*1.5*low as diamond,rand()*3*close AS rubber, 1+rand()*3*close AS lead"
@@ -1284,13 +1547,14 @@ function getReName(nm:string, subConfig: SubConfig): string {
  * Also careful because it relies on ALL charts having a very specific series/tooltip data structure. 
  * e.g. Radar options are not a good fit but luckily don't collide to a broken setup.
  */
-export function carefulOverride(options: EChartsOption, subConfig: SubConfig): EChartsOption {
+export function carefulOverride(options: EChartsOption, subConfig: SubConfig, isHorizontal:boolean = false): EChartsOption {
     const mergeSeries = (sery:SeriesOption) => {
         const nm = sery.name as string;
         const colConfig = subConfig.colConfig;
         if(nm !== undefined && nm in colConfig) {
             sery = merge(sery, colConfig[nm]); // notice, this merge overwrites name in original series if colConfig has override
-            
+            const axisChoice = colConfig[nm].axisChoice ?? "leftax";
+            set(sery,isHorizontal ? "xAxisIndex" : "yAxisIndex",axisChoice === "leftax" ? 0 : 1);
             // Must be careful with these ones, since they may or may not already by set in the various chart types
             // and since they are at depth, they may not have been merged.
             const colNameUsed = "colFormat" in colConfig[nm] ? "x_SD_" + colConfig[nm].colFormat : nm;
@@ -1302,11 +1566,22 @@ export function carefulOverride(options: EChartsOption, subConfig: SubConfig): E
 
     try {
         if(subConfig) {
+            let opt:EChartsOption = cloneDeep(options);
+            if(subConfig.overrideJson && typeof subConfig?.overrideJson === "object") {
 
-
-            let opt:EChartsOption = clone(options);
-            if(typeof subConfig?.overrideJson === "object") {
-                opt = merge(opt, subConfig.overrideJson);
+                // Opt Variations
+                // opt = {xAxis:{},yAxis:[{},{}]}
+                // opt = {xAxis:[{}.{}],yAxis:{}} - this occurs when horizontal
+                // overrideJson = { xAxis:{}, yAxis:[{},{}]} OR { xAxis:[{},{}], yAxis:{}} when horizontal
+                let customizer = (objValue:any, srcValue:any, key:any, object:any, source:any, stack:any) => {
+                    // If only override is an array. Use first item as override
+                    const isAxis = key === "yAxis" || key === "xAxis";
+                    if(isAxis && !Array.isArray(objValue) && Array.isArray(srcValue) && srcValue.length > 0) {
+                        return merge(objValue, srcValue[0]);
+                    }
+                    return undefined; // otherwise perform simple merge
+                }
+                opt = mergeWith(opt, subConfig.overrideJson, customizer);
 
                 const dzShow = get(opt,"custom.dataZoom.show",undefined);
                 if(dzShow !== undefined) {
@@ -1333,7 +1608,7 @@ export function carefulOverride(options: EChartsOption, subConfig: SubConfig): E
                     opt.series = mergeSeries(opt.series as SeriesOption);
                 }
                 const leg = get(opt, "legend.data", undefined);
-                if(Array.isArray(leg) && leg.length>0 && typeof leg[0] === "string") {
+                if(isStringArray(leg)) {
                     set(opt, "legend.data", (leg as string[]).map(nm => getReName(nm, subConfig)));
                 }
             }
@@ -1343,3 +1618,6 @@ export function carefulOverride(options: EChartsOption, subConfig: SubConfig): E
     return options;
 }
 
+export function isStringArray(o:any):boolean {
+    return Array.isArray(o) && o.length>0 && typeof o[0] === "string";
+}

@@ -1,6 +1,6 @@
 import React, { Component, useContext, useEffect, useRef, useState } from 'react';
 import { SmartRs } from '../engine/chartResultSet';
-import QueryEngine, { getSensibleServerIdx, Queryable, QueryableEditor, QueryEngineAdapter, QueryEngineListener, SERVER } from './../engine/queryEngine';
+import QueryEngine, { getSensibleServer, Queryable, QueryableEditor, QueryEngineAdapter, SERVER } from './../engine/queryEngine';
 import { fetchProcessServers, ServerConfig } from './ConnectionsPage';
 import { Button, Icon, IconName, NonIdealState, ProgressBar, Tree, TreeNodeInfo } from '@blueprintjs/core';
 import { ChartForm, ChartType, MyUpdatingChart, getH2DemoQueryable } from './ChartFactory';
@@ -154,9 +154,9 @@ function CodeEditor(props:{queryEngine:QueryEngine, serverConfigs:ServerConfig[]
     
     useEffect(() => {
         if(serverConfigs.length>0 && queryable === undefined) {
-            let serverIdx = getSensibleServerIdx(serverConfigs);
-            const serverName = serverIdx === undefined ? "" : serverConfigs[serverIdx].name;
-            const serverType = serverIdx === undefined ? undefined : serverConfigs[serverIdx].jdbcType;
+            let serverC = getSensibleServer(serverConfigs);
+            const serverName = serverC === undefined ? "" : serverC.name;
+            const serverType = serverC === undefined ? undefined : serverC.jdbcType;
             
             let sp = new URLSearchParams(window.location.search);
             let query = sp.get("qry");
@@ -295,17 +295,18 @@ function ErrDisplay(props:{exception:string}) {
 
 interface SqlResult {srs:SmartRs | null, exception:string | null, queryable:Queryable | null}
 
-class QueryToPropsComponent extends Component<{queryEngine:QueryEngine, children:(props:SqlResult) => JSX.Element}, SqlResult> implements QueryEngineListener {
+class QueryToPropsComponent extends Component<{queryEngine:QueryEngine, children:(props:SqlResult) => JSX.Element}, SqlResult> {
 
     state:SqlResult = {srs:null, exception:null, queryable:null };
 
-    tabChanged(queryable: Queryable, qTab: SmartRs): void { this.setState({srs:qTab, exception:null, queryable });  }
-    queryError(queryable: Queryable, exception: string): void { this.setState({srs:null, exception, queryable });  }
-    argChange(argKey: string, argVals: string[]): void { }
-    connectionChange(connected: boolean): void { }
-  
-    componentDidMount()    {  this.props.queryEngine.addListener(this);   }
-    componentWillUnmount() { this.props.queryEngine.removeListener(this); }
+    queryListener =  new class extends QueryEngineAdapter {
+        constructor(private parent: QueryToPropsComponent) { super(); }
+        tabChanged(queryable: Queryable, qTab: SmartRs): void { this.parent.setState({srs:qTab, exception:null, queryable });  }
+        queryError(queryable: Queryable, exception: string): void { this.parent.setState({srs:null, exception, queryable });  }
+    }(this);
+
+    componentDidMount()    {  this.props.queryEngine.addListener(this.queryListener);   }
+    componentWillUnmount() { this.props.queryEngine.removeListener(this.queryListener); }
     render() { 
         return (<ErrorBoundary FallbackComponent={getDefaultErrorFallback()} resetKeys={[this.state]}>
                     <ChartWrapper><this.props.children {...this.state} /></ChartWrapper>

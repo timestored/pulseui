@@ -6,15 +6,16 @@ import { Component } from 'react';
 import { MyInput, MyModal, WidgetProperties, KeyParamInput, MyHelpLink, UncontrolledInput, getDefaultErrorFallback } from './CommonComponents';
 import { GrCheckboxSelected, GrRadialSelected,  GrSelection, GrSort } from 'react-icons/gr';
 import { ChartWrapper } from '../styledComponents';
-import { ArgType, Queryable, UpdatingQueryable, UpdatingQueryableListener } from '../engine/queryEngine';
+import  { ArgType, Queryable, UpdatingQueryable, UpdatingQueryableListener } from '../engine/queryEngine';
 import { ItemPredicate, ItemRenderer, MultiSelect2, Select2 } from '@blueprintjs/select';
 import { BiSlider } from "react-icons/bi";
 import { SmartRs } from '../engine/chartResultSet';
 import { EmptySmartRs } from './../engine/chartResultSet';
-import { cloneDeep, debounce } from "lodash-es";
+import { clone, cloneDeep, debounce, merge, omit } from "lodash-es";
 import { Enumify } from 'enumify';
 import { ErrorBoundary } from '../ErrorBoundary';
-import { FormEvent } from 'react';
+import { ChoiceRow } from './SubConfigEditor';
+import { ActionHandler, ActionEditor, getDefaultActionHandler, runActions } from '../engine/actionHandlers';
 
 
 /**
@@ -66,6 +67,7 @@ type FormWidet = storedConfig & {
     exception:string | undefined,
     useHardcoded:boolean, 
     allowUserCreatedEntries:boolean,
+    actionHandlers:ActionHandler[],
 };
 
 type guiTypeConfig = {
@@ -97,12 +99,18 @@ export default class AForm extends Component<WidgetProperties<AFormState>,AFormS
         this.state = { ...this.state,...this.props.savedState};
         this.state.formWidgets.forEach((fw,idx) => {
             fw.uQueryable = new UpdatingQueryable(this.props.serverConfigs, this.props.queryEngine, this.getUpdateStateListener(fw.id), this.state.queryables[idx]);
+            fw.srs = (!fw.srs || fw.srs === undefined) ? EmptySmartRs : fw.srs; // was removed on savedown, so set to empty to prevent errors.
+            // Action handlers were added later so saved instances may not have them.
+            const def = getDefaultActionHandler(this.props.serverConfigs, "Change");
+            fw.actionHandlers =  (!fw.actionHandlers || fw.actionHandlers === undefined) ? [def] : fw.actionHandlers.map(c => merge(clone(def), c));
         });
         this.props.setConfigSaver(() => {
-            let r = cloneDeep(this.state);
-            let queryables = r.formWidgets.map(fw => fw.uQueryable?.queryable);
-            r.formWidgets.forEach(fw => fw.uQueryable = undefined);
-            return {...r,...{queryables:queryables}};
+            // We don't want to save full queryable state or cached srs as they can be very large.
+            // Be careful, don't even cloneDeep the full SRS as it causes stack depth exceptions.
+            let queryables = this.state.formWidgets.map(fw => fw.uQueryable?.queryable);
+            let formWidgets = this.state.formWidgets.map(fw => cloneDeep(omit(fw,['uQueryable','srs'])));
+            let r = { ...cloneDeep(omit(this.state,['queryables','formWidgets'])), queryables:queryables, formWidgets:formWidgets};
+            return r;
         });
     }
 
@@ -142,7 +150,8 @@ export default class AForm extends Component<WidgetProperties<AFormState>,AFormS
         return {id:maxId, 
             guiType:ftype, key, label:typeConfig.label, optionsList, 
             uQueryable, useHardcoded:true, srs:EmptySmartRs, exception:undefined,
-            allowUserCreatedEntries:false, sliderMin:0, sliderMax:100, datepickerAllowRange:false, datepickerAllowTimes:false};
+            allowUserCreatedEntries:false, sliderMin:0, sliderMax:100, datepickerAllowRange:false, datepickerAllowTimes:false,
+            actionHandlers:[]};
     }
 
     canMove = (direction:number, selIdx:number | undefined)  => { 
@@ -234,6 +243,10 @@ export default class AForm extends Component<WidgetProperties<AFormState>,AFormS
         let props = { 
             onArgSelected:(e:string[])=>{
                 this.props.queryEngine.setArg(formWidget.key, e, guiTypeToArgType(formWidget.guiType));
+                const ahs = formWidget.actionHandlers.filter(ah => ah.trigger === "Change");
+                if(ahs.length > 0) {
+                    runActions(this.props.queryEngine, formWidget.actionHandlers, {[formWidget.key]:e, src:formWidget.key, val:e});
+                }
             },
             args,
             options,
@@ -277,7 +290,7 @@ export default class AForm extends Component<WidgetProperties<AFormState>,AFormS
                     <p>Forms allow user interaction. Forms provide users options either from hardcoded lists or from SQL queries.
                         When a user selects an option, the configured "key" is set and can be used in queries.
                     </p>
-                    <p>You must: <ol><li>Add a component to a form</li><li>Select and modify that component in the editor</li></ol></p>
+                    <p>You must:</p><ol><li>Add a component to a form</li><li>Select and modify that component in the editor</li></ol>
                     <Button intent="success" icon={getConfig("datepicker").icon} onClick={() => this.addFW("datepicker")}>Click here to add a Date Picker</Button>
 
                   </div>}
@@ -286,17 +299,14 @@ export default class AForm extends Component<WidgetProperties<AFormState>,AFormS
             <div className='formMyModalContainer'>
             <fieldset key="FormComponents" className='FormComponents'>
             <legend>Form Components:</legend>
-            <RadioGroup label="Layout:"  inline onChange={e => {this.setState({layout:e.currentTarget.value === "Vertical" ? "Vertical" : "Horizontal"})} } 
-                selectedValue={layout}>
-                <Radio inline value="Vertical" label='Vertical' /><Radio inline value="Horizontal" label="Horizontal" />
-            </RadioGroup>
+            <ChoiceRow idPrefix="vh" choices={["Vertical","Horizontal"]} label="Layout:" selected={layout} onChange={ s => {this.setState({layout:s === "Vertical" ? "Vertical" : "Horizontal"})}  } />
             <HTMLTable bordered condensed>
                 <thead>
                 <tr><th>Label</th><th>Type</th><th>key</th><th colSpan={3}></th></tr>
                 </thead>
                 <tbody>
                 {this.state.formWidgets.map((fw, i) => 
-                    <tr key={fw.key} onClick={() => { this.setState({selectedIndex:i})}}>
+                    <tr key={fw.key} onClick={() => { this.setState({selectedIndex:i})}} className={selectedIndex === i ? "selected" : undefined}>
                     <td><MyInput label="" value={fw.label} name="myLabel" onChange={(e) => this.modify(i, {label:e.currentTarget.value})}/></td>
                     <td>
                         <this.FormTypeSelect selected={fw.guiType} onChange={(gt)=>this.modify(i, {guiType:gt})} />
@@ -316,15 +326,23 @@ export default class AForm extends Component<WidgetProperties<AFormState>,AFormS
                 </tbody>
             </HTMLTable>
             </fieldset>
-            {/* The onComplete callback has to specify the index, incase the selection changes */}
-            {selectedFW && selectedIndex !== undefined && selectedFW.guiType !== "submit" &&
-            <AFormComponentEditor selectedFW={selectedFW} modify={(formWidgetUpdate) => { this.modify(selectedIndex, formWidgetUpdate)}} />}
+            <div className="aform aformVert">
+                <h3>{selectedFW && selectedFW.key}</h3>
+                {/* The onComplete callback has to specify the index, incase the selection changes */}
+                {selectedFW && selectedIndex !== undefined && selectedFW.guiType !== "submit" &&
+                    <AFormComponentEditor key={selectedIndex} selectedFW={selectedFW} modify={(formWidgetUpdate) => { this.modify(selectedIndex, formWidgetUpdate)}} />
+                }
+                
+                {selectedFW && selectedIndex !== undefined  &&
+                    <ActionEditor key={selectedIndex+"asd"} actionHandlers={selectedFW.actionHandlers} triggerChoices={["Change"]} serverConfigs={this.props.serverConfigs}
+                                    modify={(ahlist) => { this.modify(selectedIndex, {actionHandlers:ahlist}) }} />
+                }
+            </div>
+            <div style={{height:90}}/>
         </div>
         </MyModal>}
       </div></ChartWrapper>)
     }
-
-
 }
 
 const AFormComponentEditor = (props:{selectedFW:FormWidet, modify:(formWidgetUpdate:Partial<FormWidet>)=>void}) => {
@@ -348,17 +366,11 @@ const AFormComponentEditor = (props:{selectedFW:FormWidet, modify:(formWidgetUpd
     <legend>Component Editor</legend>
     <div className='AFormComponentEditor'>
         {isRecordBased && <span>
-            <RadioGroup label="Data Source:" inline selectedValue={useHardcoded ? "List" : "SQL"}
-                onChange={(event:FormEvent<HTMLInputElement>) => {
-                    modify({useHardcoded:event.currentTarget.value === "List" ? true : false})
-                    }}>
-                <Radio label="List" value="List" />
-                <Radio label="SQL" value="SQL" />
-            </RadioGroup>
+            <ChoiceRow idPrefix="di" choices={["List","SQL"]} label="Data Source:" selected={useHardcoded ? "List" : "SQL"} onChange={s => modify({useHardcoded:s === "List" ? true : false}) } />
             {/* <Button icon={useHardcoded ? "numbered-list" : <AiOutlineConsoleSql />} rightIcon="caret-down" 
                     onClick={() => modify({useHardcoded:!useHardcoded})}>{useHardcoded ? "List" : "SQL"}</Button>|  */}
             </span>}
-            <MyHelpLink href="/help/forms" htmlTxt={useHardcoded ? hardcodedTooltip : sqlToolTip} />
+            <MyHelpLink href="help/forms" htmlTxt={useHardcoded ? hardcodedTooltip : sqlToolTip} />
         {/* {(guiType === "drop") &&
             <Checkbox checked={allowUserCreatedEntries} inline
                 onChange={()=>modify({allowUserCreatedEntries:!allowUserCreatedEntries})}>
@@ -442,14 +454,18 @@ const ACheckbox = (props:ASelectCallback) => {
 }
 
 const ASlider = (props:ASelectCallback) => {
-    let stepSize = Math.floor(props.sliderMax !== undefined ? (props.sliderMin !== undefined ? (props.sliderMax - props.sliderMin)/20 : props.sliderMax/20) : 0);
-    let sz = stepSize === 0 ? undefined : stepSize
+    let stepSize = props.sliderMax !== undefined ? (props.sliderMin !== undefined ? (props.sliderMax - props.sliderMin)/20 : props.sliderMax/20) : 0;
+    if(stepSize > 2) {
+        stepSize = Math.floor(stepSize);
+    }
+    let sz = stepSize === 0 ? undefined : stepSize;
+    let lblSize = sz === undefined ? undefined : sz * 5;
     console.log("stepSize=" + sz);
     const value = (props.args && props.args.length>0) ? parseFloat(props.args[0]) : 0;
     const [val,setValue] = useState(value);
-    return (<div style={{width:"90%"}}>
+    return (<div style={{width:"70%"}}>
             <Slider onRelease={n => props.onArgSelected([""+n])} onChange={setValue} min={props.sliderMin} max={props.sliderMax} value={val} 
-                stepSize={sz} labelStepSize={sz} />
+                stepSize={sz} labelStepSize={lblSize} />
         </div>);
 }
     
@@ -475,8 +491,14 @@ function toOptionRowsFromRs(srs:SmartRs):Array<IOptionRow> {
 }
 
 
-const filterOptionRow: ItemPredicate<IOptionRow> = (query, optionRow) => {
-    return (`${optionRow.val}. ${optionRow.niceName}`.indexOf(query.toLowerCase()) >= 0);
+const filterOptionRow: ItemPredicate<IOptionRow> = (query, optionRow, _index, exactMatch) => {
+    const qr = query.toLowerCase();
+    if (exactMatch) {
+		return optionRow.val === qr;
+	} else {
+        const v = optionRow.val.toLowerCase() + '.' + optionRow.niceName?.toLowerCase() ?? ''
+        return v.indexOf(qr) >= 0;
+	}
 }
 
 export const ASelectSingle = (props:{allowUserCreatedEntries?:boolean} & ASelectCallback) => {
@@ -485,7 +507,9 @@ export const ASelectSingle = (props:{allowUserCreatedEntries?:boolean} & ASelect
     // const OptionRowSuggest = Suggest.ofType<IOptionRow>();
     const sArgs = props.selectedArgs;
     const renderOptionRow: ItemRenderer<IOptionRow> = ( optionRow, { handleClick, modifiers, query }) => {
-        if (!modifiers.matchesPredicate) { return null; }
+        if (!modifiers.matchesPredicate) { 
+            return null; 
+        }
         const text = optionRow.niceName || optionRow.val;
         return ( <MenuItem icon={sArgs.map(e=>e.val).indexOf(optionRow.val) === -1 ? "blank" : "tick"} 
             active={modifiers.active} disabled={modifiers.disabled} label={optionRow.label} key={optionRow.val} text={text} onClick={handleClick}/>);

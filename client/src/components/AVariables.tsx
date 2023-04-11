@@ -1,25 +1,64 @@
 import React, { useState } from 'react';
 import { WidgetProperties } from './CommonComponents';
-import  { QueryEngineAdapter } from './../engine/queryEngine';
+import  { ArgMap, Queryable, QueryEngineAdapter } from './../engine/queryEngine';
 import { HTMLTable } from '@blueprintjs/core';
 import { useEffect } from 'react';
+import { SmartRs } from '../engine/chartResultSet';
+import Collapsible from 'react-collapsible';
 
 const  AVariables = (props:WidgetProperties<null>, state:{argMap:{[argKey:string]:string[]}}) => {
 
     const [argMap, setArgMap] = useState(props.queryEngine.argMap);
+    const [changedArgs, setChangedArgs] = useState<string[]>([]);
+    const [exception, setException] = useState<string>("");
+    
+    const [actionArgMap, setActionArgMap] = useState(props.queryEngine.argMap);
+    const [actionQuery, setActionQuery] = useState<Queryable|undefined>(undefined);
+
     useEffect(() => {
         let listener = new class extends QueryEngineAdapter {
-            argChange(key: string, newValue: any): void {
+	        argsChanged(argMap: ArgMap): void {
+                setChangedArgs(Object.keys(argMap));
                 setArgMap(props.queryEngine.argMap);
+            }
+            tabChanged(queryable: Queryable, qTab: SmartRs): void { }
+            queryError(queryable: Queryable, exception: string): void {  setException(exception); }
+
+            sendingQuery(queryable: Queryable, argMap: ArgMap): void {
+                setActionArgMap(argMap);
+                setActionQuery(queryable);
             }
         }();
         props.queryEngine.addListener(listener);
         return () => props.queryEngine.removeListener(listener);
     },[props.queryEngine]);
 
-    return (<div><HTMLTable bordered interactive condensed>
-            <thead><tr><th>Key</th><th>Value(s)</th></tr></thead>
-            <tbody>{argMap &&  Object.keys(argMap).map(s => <tr key={s}><th>{s}</th><td>{argMap[s].join(",")}</td></tr>)}</tbody>
-        </HTMLTable></div>);
+    return (<div className="adebug">
+        <Collapsible trigger="Globals" open={true} >
+            <ArgTable argMap={argMap} highlightedArgs={changedArgs} />
+        </Collapsible>
+        <Collapsible trigger="Latest Error">
+            <p>{exception}</p>
+        </Collapsible>
+        <Collapsible trigger="Latest Action Event">
+            {actionQuery ? <><p>{actionQuery.serverName} &lt;- {actionQuery.query}</p>
+                                <ArgTable argMap={actionArgMap} highlightedArgs={[]} />
+                            </>
+                        : <p>No Action</p>}
+        </Collapsible>
+        </div>);
 }
+
+
+const  ArgTable = (props:{argMap:ArgMap, highlightedArgs:string[] }) => {
+    const { argMap, highlightedArgs } = props;
+    return <HTMLTable bordered interactive condensed>
+        <thead><tr><th>Key</th><th>Value(s)</th></tr></thead>
+        <tbody>{argMap &&  Object.keys(argMap).map(s => <tr key={s}>
+                <th>{s}</th>
+                <td className={highlightedArgs.includes(s) ? "selected" : undefined}>{argMap[s].join(",")}</td>
+        </tr>)}</tbody>
+    </HTMLTable>
+}
+
 export default AVariables;

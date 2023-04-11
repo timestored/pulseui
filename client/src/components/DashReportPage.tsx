@@ -229,7 +229,7 @@ function DashReportResultPageInner(props:{dash:Dash}) {
     }
     
     return <>
-        <BreadCrumbHeader dash={dash}  pageSelected="reports" />
+        <BreadCrumbHeader dashId={dash.id} dashName={dash.name}  pageSelected="reports" />
         {dash && <EmailReportButton dashId={dash.id} showAdminControls={false}/>}
         <div><HTMLTable condensed striped bordered>
             <thead><tr><th>Email</th><th>Report</th><th>URL</th><th>Started</th><th>Updated</th><th>Completed</th><th>Image</th><th>Succeeded</th></tr></thead>
@@ -249,14 +249,15 @@ function DashReportResultPageInner(props:{dash:Dash}) {
 }
  
 
-export type PageSelected = "config" | "reports" | "history";
-export function BreadCrumbHeader(props:{dash:Dash,pageSelected:PageSelected }) {
+export type PageSelected = "config" | "reports" | "history" | "rawjson";
+export function BreadCrumbHeader(props:{dashId:number,dashName:string,pageSelected:PageSelected }) {
     const ps = props.pageSelected;
     const BREADCRUMBS: BreadcrumbProps[] = [
         { href: "/dash", text: "Dashboards" },
-        { href: "/dash/" + props.dash.id, icon: undefined, text: props.dash.name },
+        { href: "/dash/" + props.dashId, icon: undefined, text: props.dashName },
         ps === "config" ? { icon: <RiMailSettingsLine />, text: "Report Configuration" }
             : ps === "history" ? { icon: "history", text: "Dashboard History" }
+            : ps === "rawjson" ? { icon: "code", text: "Raw JSON" }
             : { icon: "envelope", text: "Reports" }
     ];
 
@@ -302,7 +303,7 @@ function DashReportPageInner(props:{dash:Dash}) {
     function refreshR() { refreshReports(dash.id, setReports, true); }
 
     return (<>
-    <BreadCrumbHeader dash={dash}  pageSelected="config" />
+    <BreadCrumbHeader dashId={dash.id} dashName={dash.name}   pageSelected="config" />
 
     <Button icon="add" small onClick={() => { setEditId({...newReportConfig, dashId:dash.id, url:"/dash/" + dash.id}); }} intent="success">Add Report for Dashboard</Button>
     <Link to={"/dash/reports/" + dash.id + "/emails/" + dash.name}><Button small icon="envelope">Report Runs</Button></Link>
