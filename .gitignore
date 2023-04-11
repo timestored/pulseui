@@ -9,7 +9,7 @@
 /coverage
 
 # production
-/build
+/client/build
 
 # misc
 .DS_Store
@@ -24,11 +24,11 @@ yarn-error.log*
 
 .eslintcache
 /ideas
-/bitbucket-pipelines.yml
-/build.gradle
-/package-lock.json
-/tsconfig.json
-/src/react-app-env.d.ts
-/src/reportWebVitals.ts
-/src/setupTests.ts
+/client/bitbucket-pipelines.yml
+/client/build.gradle
+/client/package-lock.json
+/client/tsconfig.json
+/client/src/react-app-env.d.ts
+/client/src/reportWebVitals.ts
+/client/src/setupTests.ts
 *.test.tsx
