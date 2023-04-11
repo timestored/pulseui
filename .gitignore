@@ -32,3 +32,4 @@ yarn-error.log*
 /client/src/reportWebVitals.ts
 /client/src/setupTests.ts
 *.test.tsx
+build

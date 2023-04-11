@@ -1,0 +1,36 @@
+
+plugins {
+    id 'application'
+	id 'com.github.johnrengelman.shadow' version '7.1.2'
+	id 'java'	
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.8.1'
+    implementation 'org.questdb:questdb:6.7-jdk8'
+    
+	compileOnly 'org.projectlombok:lombok:1.18.24'
+	annotationProcessor 'org.projectlombok:lombok:1.18.24'
+	testCompileOnly 'org.projectlombok:lombok:1.18.24'
+	testAnnotationProcessor 'org.projectlombok:lombok:1.18.24'
+	
+	implementation 'org.knowm.xchange:xchange-core:5.1.0'
+	implementation 'org.knowm.xchange:xchange-stream-bitstamp:5.1.0'
+	implementation 'org.knowm.xchange:xchange-stream-binance:5.1.0'
+	implementation 'org.knowm.xchange:xchange-stream-bitfinex:5.1.0'
+	implementation 'org.knowm.xchange:xchange-stream-kraken:5.1.0'
+	implementation 'org.knowm.xchange:xchange-stream-okex:5.1.0'
+
+}
+	
+application {
+    mainClass = 'com.timestored.qdb.BitcoinDemo'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
