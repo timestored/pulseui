@@ -1,4 +1,4 @@
-qdb/
-build/
+./qdb/
+./build/
 .settings/
 .gradle/
