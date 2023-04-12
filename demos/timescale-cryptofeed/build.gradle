@@ -27,6 +27,10 @@ dependencies {
 	implementation 'org.knowm.xchange:xchange-stream-okex:5.1.0'
 
 }
+
+shadowJar{
+    archiveFileName = "pgfeed.jar"
+}
 	
 application {
     mainClass = 'com.timestored.qdb.PGBitcoinDemo'

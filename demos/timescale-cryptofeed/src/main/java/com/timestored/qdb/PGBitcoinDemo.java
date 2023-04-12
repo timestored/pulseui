@@ -40,7 +40,7 @@ import lombok.extern.java.Log;
 	
     private static final String URL = "jdbc:postgresql://odrlt9p4il.j26c6ws540.tsdb.cloud.timescale.com:31319/tsdb?sslmode=require";
     private static final String USER = "tsdbadmin";
-    private static final String PASSWORD = "wfs87wik6faoyrs9";
+    private static final String PASSWORD = "wfs87w1k6fa0yrs9";
     
 	private static final long TIMEWINDOW = 1000; // 1000 millis = 1 second
 	private static final List<CurrencyPair> PAIRS = new ArrayList<>();
@@ -58,33 +58,53 @@ import lombok.extern.java.Log;
 	private Random r = new Random();
 	private final Connection conn;
 
+	public static void exec(ConnectionProvider connProvider, String sql) throws SQLException {
+		Connection cn = connProvider.getConnection();
+		Statement st = cn.createStatement();
+		log.info(sql);
+		st.execute(sql);
+		cn.commit();
+		st.close();
+		cn.close(); 
+	}
+	
 	public static void main(String[] args) throws SQLException, InterruptedException {
 		String url = URL;
 		String user = USER;
 		String password = PASSWORD;
-		if(args.length >= 1) { user = args[0]; }
-		if(args.length >= 2) { password = args[1]; }
-		if(args.length >= 3) { url = args[2]; }
+		if(args.length < 1) {
+			System.out.println("Command line arguments required.");
+			System.out.println("java -jar pgfeed.jar URL username password");
+			System.out.println("e.g.");
+			System.out.println("java -jar pgfeed.jar " + URL + " " + USER + " " + PASSWORD);
+			System.exit(1);
+		}
+		if(args.length >= 1) { url = args[0]; }
+		if(args.length >= 2) { user = args[1]; }
+		if(args.length >= 3) { password = args[2]; }
+		
 		ConnectionProvider connProvider = new ConnectionProvider(user, password, url);
 		
-		Connection cn = connProvider.getConnection();
-		Statement st = cn.createStatement();
-		st.execute("DROP TABLE IF EXISTS trade;");
-		st.execute("CREATE TABLE IF NOT EXISTS trade(etime TIMESTAMP  WITHOUT TIME ZONE NOT NULL, sym VARCHAR(20),ex VARCHAR(20),account VARCHAR(50),"
+		exec(connProvider, "DROP TABLE IF EXISTS trade;"
+				+ "\r\nCREATE TABLE IF NOT EXISTS trade(etime TIMESTAMP  WITHOUT TIME ZONE NOT NULL, sym VARCHAR(20),ex VARCHAR(20),account VARCHAR(50),"
 				+ "type VARCHAR(20),price DOUBLE PRECISION,amount DOUBLE PRECISION,id BIGINT);");
-		st.execute("SELECT create_hypertable('trade', 'etime', 'sym', 5);");
 		
-		st.execute("DROP TABLE IF EXISTS orders;");
-		st.execute("CREATE TABLE IF NOT EXISTS orders(etime TIMESTAMP  WITHOUT TIME ZONE NOT NULL, sym VARCHAR(20), ex VARCHAR(20), bid DOUBLE PRECISION, bsize DOUBLE PRECISION, ask DOUBLE PRECISION, asize DOUBLE PRECISION, \r\n"
+		
+		
+		exec(connProvider, "DROP TABLE IF EXISTS orders;"
+				+ "\r\nCREATE TABLE IF NOT EXISTS orders(etime TIMESTAMP  WITHOUT TIME ZONE NOT NULL, sym VARCHAR(20), ex VARCHAR(20), bid DOUBLE PRECISION, bsize DOUBLE PRECISION, ask DOUBLE PRECISION, asize DOUBLE PRECISION, \r\n"
 				+ "    		bid1 DOUBLE PRECISION, bid2 DOUBLE PRECISION, bid3 DOUBLE PRECISION, bid4 DOUBLE PRECISION, bid5 DOUBLE PRECISION, bid6 DOUBLE PRECISION, bid7 DOUBLE PRECISION, bid8 DOUBLE PRECISION, \r\n"
 				+ "    		bsize1 DOUBLE PRECISION, bsize2 DOUBLE PRECISION, bsize3 DOUBLE PRECISION, bsize4 DOUBLE PRECISION, bsize5 DOUBLE PRECISION, bsize6 DOUBLE PRECISION, bsize7 DOUBLE PRECISION, bsize8 DOUBLE PRECISION, \r\n"
 				+ "    		ask1 DOUBLE PRECISION, ask2 DOUBLE PRECISION, ask3 DOUBLE PRECISION, ask4 DOUBLE PRECISION, ask5 DOUBLE PRECISION, ask6 DOUBLE PRECISION, ask7 DOUBLE PRECISION, ask8 DOUBLE PRECISION, \r\n"
 				+ "    		asize1 DOUBLE PRECISION, asize2 DOUBLE PRECISION, asize3 DOUBLE PRECISION, asize4 DOUBLE PRECISION, asize5 DOUBLE PRECISION, asize6 DOUBLE PRECISION, asize7 DOUBLE PRECISION, asize8 DOUBLE PRECISION);");
-		st.execute("SELECT create_hypertable('orders', 'etime', 'sym', 5);");
+
+		try {
+			exec(connProvider, "SELECT create_hypertable('trade', 'etime', 'sym', 5);");
+			exec(connProvider, "SELECT create_hypertable('orders', 'etime', 'sym', 5);");
+		} catch(SQLException sql) {
+			log.info("Ignoring hypertable error - This will work on Timescale ONLY");
+		}
 		
-		cn.commit();
-		st.close();
-		cn.close(); 
 		
 		StreamingExchangeFactory f = StreamingExchangeFactory.INSTANCE;
 //		new BitcoinDemo(f.createExchange(BinanceStreamingExchange.class), "binance", CurrencyPair.BTC_USD);
@@ -109,7 +129,7 @@ import lombok.extern.java.Log;
 		}
 	}
 	
-	PGBitcoinDemo(ConnectionProvider connectionProvider, StreamingExchange exchange, String ex, final CurrencyPair cp) throws SQLException {
+	PGBitcoinDemo(ConnectionProvider connectionProvider, StreamingExchange exchange, final String ex, final CurrencyPair cp) throws SQLException {
 		this.conn = connectionProvider.getConnection();
 		exchange.connect().blockingAwait();
 
@@ -120,20 +140,22 @@ import lombok.extern.java.Log;
 				fetchAllPairs(marketDataService, 7_000, ex);
 			}
 		}).start();
-		
-		new Thread(() -> {
-			// Subscribe to live trades update.
-			Disposable subscription1 = exchange.getStreamingMarketDataService()
-			    .getTrades(cp) // BTC_USD
-			    .subscribe(
-			        trade -> sendTrade(ex, trade),
-			        throwable -> log.log(Level.SEVERE, "Error in trade subscription", throwable));
+
+		if(!ex.toLowerCase().equals("okex")) {
+			new Thread(() -> {
+				// Subscribe to live trades update.
+				Disposable subscription1 = exchange.getStreamingMarketDataService()
+				    .getTrades(cp) // BTC_USD
+				    .subscribe(
+				        trade -> sendTrade(ex, trade),
+				        throwable -> log.log(Level.SEVERE, "Error in trade subscription", throwable));
 
 			// Subscribe order book data with the reference to the subscription.
 			Disposable subscription2 = exchange.getStreamingMarketDataService()
 			    .getOrderBook(cp)
 			    .subscribe(orderBook -> sendOrderBook(ex, orderBook));
-		}).start();
+			}).start();
+		}
 
 	}
 
