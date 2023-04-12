@@ -86,13 +86,13 @@ import lombok.extern.java.Log;
 		ConnectionProvider connProvider = new ConnectionProvider(user, password, url);
 		
 		exec(connProvider, "DROP TABLE IF EXISTS trade;"
-				+ "\r\nCREATE TABLE IF NOT EXISTS trade(etime TIMESTAMP  WITHOUT TIME ZONE NOT NULL, sym VARCHAR(20),ex VARCHAR(20),account VARCHAR(50),"
-				+ "type VARCHAR(20),price DOUBLE PRECISION,amount DOUBLE PRECISION,id BIGINT);");
+				+ "\r\nCREATE TABLE IF NOT EXISTS trade(etime TIMESTAMPTZ NOT NULL, sym TEXT,ex TEXT,account TEXT,"
+				+ "type TEXT,price DOUBLE PRECISION,amount DOUBLE PRECISION,id BIGINT);");
 		
 		
 		
 		exec(connProvider, "DROP TABLE IF EXISTS orders;"
-				+ "\r\nCREATE TABLE IF NOT EXISTS orders(etime TIMESTAMP  WITHOUT TIME ZONE NOT NULL, sym VARCHAR(20), ex VARCHAR(20), bid DOUBLE PRECISION, bsize DOUBLE PRECISION, ask DOUBLE PRECISION, asize DOUBLE PRECISION, \r\n"
+				+ "\r\nCREATE TABLE IF NOT EXISTS orders(etime TIMESTAMPTZ NOT NULL, sym TEXT, ex TEXT, bid DOUBLE PRECISION, bsize DOUBLE PRECISION, ask DOUBLE PRECISION, asize DOUBLE PRECISION, \r\n"
 				+ "    		bid1 DOUBLE PRECISION, bid2 DOUBLE PRECISION, bid3 DOUBLE PRECISION, bid4 DOUBLE PRECISION, bid5 DOUBLE PRECISION, bid6 DOUBLE PRECISION, bid7 DOUBLE PRECISION, bid8 DOUBLE PRECISION, \r\n"
 				+ "    		bsize1 DOUBLE PRECISION, bsize2 DOUBLE PRECISION, bsize3 DOUBLE PRECISION, bsize4 DOUBLE PRECISION, bsize5 DOUBLE PRECISION, bsize6 DOUBLE PRECISION, bsize7 DOUBLE PRECISION, bsize8 DOUBLE PRECISION, \r\n"
 				+ "    		ask1 DOUBLE PRECISION, ask2 DOUBLE PRECISION, ask3 DOUBLE PRECISION, ask4 DOUBLE PRECISION, ask5 DOUBLE PRECISION, ask6 DOUBLE PRECISION, ask7 DOUBLE PRECISION, ask8 DOUBLE PRECISION, \r\n"
@@ -161,8 +161,8 @@ import lombok.extern.java.Log;
 
     private static final String TRADE_IN = "INSERT INTO trade(etime, sym,ex,account,type,price,amount,id) "
             + "VALUES(?,?,?,?,?,?,?,?)";
-	
-	// CREATE TABLE IF NOT EXISTS trade(sym SYMBOL, price DOUBLE, amount DOUBLE, id LONG, etime TIMESTAMP, ts TIMESTAMPT) timestamp(ts);
+
+
 	private void sendTrade(String exchange, Trade trade) {
 //		log.log(Level.INFO, "Trade: " + trade);
 		System.out.print("T");
@@ -228,7 +228,6 @@ import lombok.extern.java.Log;
             + "?,?,?,?,?,?,?,?"
             + ")";
     
-	// CREATE TABLE IF NOT EXISTS order(sym SYMBOL, bid DOUBLE, ask DOUBLE, ts TIMESTAMP) timestamp(ts);
 	private void sendOrderBook(String exchange, OrderBook orderBook) {
 //		log.log(Level.INFO, "OrderBook: " + orderBook);
 		System.out.print(".");
