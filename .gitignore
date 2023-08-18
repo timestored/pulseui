@@ -1,35 +1,19 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
-
-# testing
-/coverage
-
-# production
-/client/build
-
-# misc
+Thumbs.db
 .DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-.eslintcache
-/ideas
-/client/bitbucket-pipelines.yml
-/client/build.gradle
-/client/package-lock.json
-/client/tsconfig.json
-/client/src/react-app-env.d.ts
-/client/src/reportWebVitals.ts
-/client/src/setupTests.ts
-*.test.tsx
-build
+.gradle
+build/
+target/
+out/
+.idea
+*.iml
+*.ipr
+*.iws
+.project
+.settings
+.classpath
+.factorypath
+/inspiration
+/server/public
+/server/pulsedb.mv.db
+/server/pulsedb.trace.db
+node_modules
