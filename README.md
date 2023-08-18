@@ -1,19 +1,20 @@
-# pulse
+# Pulse
 
 ![Pulse](/multi-chart3-dark.jpg)
 
 For more info see [timestored.com/pulse](http://timestored.com/pulse "timestored.com/pulse")
 
-Pulse is a tool for real-time visual analysis, email reporting and alerting.
+Pulse is an open source tool for real-time visual analysis, email reporting and alerting.
 It allows you to create and share real-time interactive applications with your team.
 
-Pulse supports kdb, postgresql, mysql, ms sql, clickhouse. 
-Databases that are wire compatible with postgres/mysql should also work i.e. timescale, questdb, cockroachdb.
+Pulse supports 40+ databases including kdb, postgresql, mysql, ms sql, clickhouse. 
+Databases that are wire compatible with postgres/mysql also work i.e. timescale, questdb, cockroachdb.
 
 
 
 # 1.xx Releases
 
+    2023-08-18 - 1.50 - Open Sourced Version
     2023-08-14 - 1.36 - Improve server tree listing for more databases.
     2023-08-07 - 1.34 - Add variable formatters.
     2023-08-01 - 1.33 - Support many more database integrations: clickhouse, mongodb, influxdb, SAP.
