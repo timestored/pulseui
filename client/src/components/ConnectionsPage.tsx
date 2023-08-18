@@ -1,7 +1,34 @@
-import React, { useState, useEffect, Component } from 'react';
+/*******************************************************************************
+ *
+ *   $$$$$$$\            $$\                     
+ *   $$  __$$\           $$ |                     
+ *   $$ |  $$ |$$\   $$\ $$ | $$$$$$$\  $$$$$$\   
+ *   $$$$$$$  |$$ |  $$ |$$ |$$  _____|$$  __$$\  
+ *   $$  ____/ $$ |  $$ |$$ |\$$$$$$\  $$$$$$$$ |  
+ *   $$ |      $$ |  $$ |$$ | \____$$\ $$   ____|  
+ *   $$ |      \$$$$$$  |$$ |$$$$$$$  |\$$$$$$$\  
+ *   \__|       \______/ \__|\_______/  \_______|
+ *
+ *  Copyright c 2022-2023 TimeStored
+ *
+ *  Licensed under the Reciprocal Public License RPL-1.5
+ *  You may obtain a copy of the License at
+ *
+ *  https://opensource.org/license/rpl-1-5/
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ ******************************************************************************/
+ 
+import React, { useState, useEffect, Component, SetStateAction, Dispatch } from 'react';
 import axios from 'axios';
+//import '../dbsprites.css';
 import { Number, String, Array, Record, Static, Undefined, Partial } from 'runtypes';
-import { Alert, Button, FormGroup, HTMLTable, InputGroup, Intent, Spinner, MaybeElement, Icon, IconName, HTMLSelect, SpinnerSize, Collapse, NonIdealState } from '@blueprintjs/core';
+import { Alert, Button, FormGroup, HTMLTable, InputGroup, Intent, Spinner, MaybeElement, Icon, IconName, HTMLSelect, SpinnerSize, Collapse, NonIdealState, RadioGroup, Radio } from '@blueprintjs/core';
 import { SERVER } from '../engine/queryEngine';
 import { MyInput, MyOverlay } from './CommonComponents';
 import { Enumify } from 'enumify';
@@ -9,6 +36,7 @@ import { notyf } from '../context';
 import { SiMysql, SiPostgresql } from "react-icons/si";
 import { DiMsqlServer } from "react-icons/di";
 import { analytics } from '../App';
+import { useCacheThenUpdate } from './hooks';
 
 const newServerConfig: ServerConfig = { id: -1, name: "", host: "localhost", port: 5000, jdbcType: "KDB", database: "", username: "", password: "", 
                 url: undefined, queryWrapPre:"", queryWrapPost:"" };
@@ -29,60 +57,49 @@ const ServerConfigR = Record({
 export type ServerConfig = Static<typeof ServerConfigR>;
 
 
-export async function fetchProcessServers(process: (s: ServerConfig[]) => void) {
-    axios.get<ServerConfig[]>(SERVER + "/dbserver")
-        .then(r => {
-            let scee:ServerConfig[] = Array(ServerConfigR).check(r.data)
-            process(scee);
-        })
-};
+export function useServerConfigs(): [serverConfigs:ServerConfig[], setServerConfigs:Dispatch<SetStateAction<ServerConfig[]>>, refresh:()=>void] {    
+    async function fetchProcessServers() {
+        const r = await axios.get<ServerConfig[]>(SERVER + "/dbserver");
+        Array(ServerConfigR).check(r.data);
+        return (r.data as unknown as ServerConfig[]);
+    }
+    return useCacheThenUpdate<ServerConfig[]>("connections", [], fetchProcessServers, ()=>{});
+  }
 
 export function containsUserConn(serverConfigs:ServerConfig[]) {
     return serverConfigs.length > 1 || (serverConfigs.length === 1 && serverConfigs[0].name.toUpperCase() !== "DEMODB");
 }
 
 function ConnectionsPage() {
-    const [serverConfigs, setServerConfigs] = useState<ServerConfig[]>([]);
+    const [serverConfigs, , refreshServerConfigs] = useServerConfigs();
     const [deleteId, setDeleteId] = useState<ServerConfig>();
     const [editId, setEditId] = useState<ServerConfig>();
     const [editServerList, setEditServerList] = useState<boolean>(false);
 
     const addConn = (jc: jdbcConnection) => {
-        let sc: ServerConfig = {
-            id: -1, name: jc.name + ":" + jc.defaultPort, username: jc.defaultUsername, port: jc.defaultPort,
+        const sc: ServerConfig = {
+            id: -1, name: jc.name + ":" + jc.defaultPort, username: "", port: jc.defaultPort,
             host: "localhost", jdbcType: jc.name, database: undefined, url: undefined, password: undefined,
             queryWrapPre: undefined, queryWrapPost:undefined
         };
-        const run = async () => {
-            axios.post<ServerConfig>(SERVER + "/dbserver", sc)
-                .then(r => {
-                    ServerConfigR.check(r.data);
-                    notyf.success("Connection Added");
-                    fetchProcessServers(setServerConfigs);
-                    setEditId(r.data);
-                }).catch((e) => {
-                    notyf.error("Connection Failed to Add");
-                });
-        };
-        run();
+        setEditId(sc);
     }
 
     async function deleteItem(id: number) {
         await axios.delete<ServerConfig[]>(SERVER + "/dbserver/" + id);
-        fetchProcessServers(setServerConfigs);
+        refreshServerConfigs();
         analytics.track("Connection - Deleted: " + id);
         console.log("Connection - Deleted: " + id);
-    };
+    }
 
-    useEffect(() => { fetchProcessServers(setServerConfigs); }, []);
     useEffect(() => { document.title = "Connections" }, []);
     const clearSelection = () => {
         setEditId(undefined);
         setEditServerList(false);
-        fetchProcessServers(setServerConfigs);
+        refreshServerConfigs();
     }
     const isEmpty = serverConfigs.length === 0;
-    const addDCbutton = <Button icon="add" small onClick={() => { setEditId(newServerConfig); }} intent={containsUserConn(serverConfigs) ? "primary" : "success"}>Add Data Connection</Button>;
+    const addDCbutton = <Button icon="add" small onClick={() => { setEditId(newServerConfig); }} intent={containsUserConn(serverConfigs) ? "primary" : "success"}>Connect Data</Button>;
 
     return <><div>
         <h1>Connections</h1>
@@ -96,10 +113,10 @@ function ConnectionsPage() {
                 <thead><tr><th>name</th><th>type</th><th>host:port</th><th>database</th><th>credentials</th><th>edit</th><th>delete</th></tr></thead>
                 <tbody>
                     {serverConfigs.map(sc => {
-                        let jdbcConn = (jdbcConnection.enumValueOf(sc.jdbcType) as jdbcConnection);
+                        const jdbcConn = (jdbcConnection.enumValueOf(sc.jdbcType) as jdbcConnection);
                         return (<tr key={sc.id} onClick={() => { setEditId(sc) }} >
                             <td>{sc.name}</td>
-                            <td><Icon icon={jdbcConn.icon} /> {jdbcConn.niceName}</td>
+                            <td>{jdbcConn.niceName}</td>
                             <td>{sc.host}:{sc.port}</td><td>{sc.database}</td><td>{sc.username}</td>
                             <td><Button icon="edit" small onClick={() => { setEditId(sc) }} /></td>
                             <td><Button icon="delete" intent={Intent.DANGER} small onClick={(e) => { e.stopPropagation(); setDeleteId(sc); }} /></td>
@@ -118,7 +135,7 @@ function ConnectionsPage() {
                 </tbody>
             </HTMLTable>
         }
-        {!containsUserConn(serverConfigs) &&  <ConnectionHelp addConn={addConn} />}
+        <ConnectionHelp addConn={addConn} />
         <MyOverlay isOpen={editId !== undefined} handleClose={clearSelection} title={(editId?.id === -1 ? "Add" : "Edit") + " Data Connection"}>
             <ConnectionsEditor serverConfig={editId!} clearSelection={clearSelection} />
         </MyOverlay>
@@ -193,7 +210,7 @@ class ConnectionsEditor extends Component<EditorProps, ConnectionsEditorState> {
 
     constructor(props: EditorProps) {
         super(props);
-        let sc = this.props.serverConfig ?
+        const sc = this.props.serverConfig ?
             this.props.serverConfig :
             newServerConfig;
         this.state = { serverConfig: sc, testState: { state: "" }, saveState: { state: "" }, showAdvanced:false };
@@ -213,7 +230,7 @@ class ConnectionsEditor extends Component<EditorProps, ConnectionsEditorState> {
     }
 
     saveConn = () => {
-        let sc = this.state.serverConfig;
+        const sc = this.state.serverConfig;
         if (sc.name === undefined || sc.name.length < 1) {
             sc.name = sc.jdbcType + ":" + sc.host + ":" + sc.port;
         }
@@ -221,7 +238,7 @@ class ConnectionsEditor extends Component<EditorProps, ConnectionsEditorState> {
         this.setState({ saveState: { state: "running" } });
 
         const run = async () => {
-            let upsert = isAdd ? axios.post : axios.put;
+            const upsert = isAdd ? axios.post : axios.put;
             upsert<ServerConfig>(SERVER + "/dbserver", sc)
                 .then(r => {
                     ServerConfigR.check(r.data);
@@ -237,11 +254,11 @@ class ConnectionsEditor extends Component<EditorProps, ConnectionsEditorState> {
     }
 
     render() {
-        let sc = this.state.serverConfig;
+        const sc = this.state.serverConfig;
         const isAdd = sc.id === -1;
 
         const setMerged = (name: string, val: any) => {
-            let sc = { ...this.state.serverConfig, ...{ [name]: val } as unknown as ServerConfig };
+            const sc = { ...this.state.serverConfig, ...{ [name]: val } as unknown as ServerConfig };
             this.setState({ serverConfig: sc, testState: { state: "" } });
         }
 
@@ -249,14 +266,44 @@ class ConnectionsEditor extends Component<EditorProps, ConnectionsEditorState> {
             setMerged(e.currentTarget.name, e.currentTarget.value);
         };
         const isKDB = (sc.jdbcType === "KDB" || sc.jdbcType === "KDB_STREAMING");
+        const jdbcConn = (jdbcConnection.enumValueOf(this.state.serverConfig.jdbcType) as jdbcConnection);
 
         return <>
             <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); this.saveConn(); }}>
                 <MyInput label="Name:" value={sc.name} name="name" onChange={handleChange} placeholder={sc.name.length > 0 ? sc.name : (sc.jdbcType + ":" + sc.host + ":" + sc.port)} />
-                <JdbcSelect jdbcTypeSelected={sc.jdbcType} onChange={e => { setMerged("jdbcType", e.currentTarget.value) }} />
-                <MyInput label="Host:" value={sc.host} name="host" onChange={handleChange} placeholder="localhost or server.com" />
-                <MyInput label="Port:" value={sc.port ? "" + sc.port : ""} name="port" onChange={e => { setMerged("port", parseInt(e.currentTarget.value)) }} placeholder="3306" />
-                {(!isKDB) && <MyInput label="Database:" value={sc.database} name="database" onChange={handleChange} />}
+                <JdbcSelect jdbcTypeSelected={sc.jdbcType} onChange={e => { 
+                        const jdbcT = e.currentTarget.value;
+                        const newJdbcConn = (jdbcConnection.enumValueOf(jdbcT) as jdbcConnection);
+                        let port = this.state.serverConfig.port;
+                        let database = this.state.serverConfig.database;
+                        if(!newJdbcConn.exampleURL.toLowerCase().includes("{host}")) {
+                            port = 0; 
+                        }
+                        if(port === 0) {
+                            database = newJdbcConn.exampleURL;
+                        }
+                        const sc = { ...this.state.serverConfig, ...{ jdbcType: jdbcT, port:port, database:database } };
+                        this.setState({ serverConfig: sc, testState: { state: "" } });
+                }} />
+                
+                <RadioGroup inline className="urlHostRadio" label="Connect By: " onChange={e => {
+                        const port = e.currentTarget.value === "url" ? 0 : (jdbcConn.defaultPort > 0 ? jdbcConn.defaultPort : 5000);
+                        const database = e.currentTarget.value === "url" ? jdbcConn.exampleURL : "";
+                        const sc = { ...this.state.serverConfig, ...{ port:port, database:database } };
+                        this.setState({ serverConfig: sc, testState: { state: "" } });
+                    }} selectedValue={sc.port === 0 ? "url" : "host"} >
+                    <Radio label="Host" value="host" />
+                    <Radio label="URL" value="url" />
+                </RadioGroup>
+
+                <MyInput label="URL:" value={sc.port === 0 ? sc.database : jdbcConn.exampleURL} name="database" onChange={handleChange} disabled={sc.port !== 0} size={50} />
+
+                {sc.port !== 0 && 
+                        <><MyInput label="Host:" value={sc.host} name="host" onChange={handleChange} placeholder="localhost or server.com" size={40} />
+                        <MyInput label="Port:" value={sc.port ? "" + sc.port : ""} name="port" onChange={e => { setMerged("port", parseInt(e.currentTarget.value)) }} placeholder="3306" />
+                        {(!isKDB) && <MyInput label="Database:" value={sc.database} name="database" onChange={handleChange} />}</>
+                }
+                
                 <br />
                 <FormGroup label="Username:" labelFor="connUser" inline labelInfo="(optional)" >
                     <InputGroup id="connUser" value={sc.username} name="username" onChange={handleChange} />
@@ -286,7 +333,8 @@ class ConnectionsEditor extends Component<EditorProps, ConnectionsEditorState> {
 }
 
 export function JdbcSelect(props: { jdbcTypeSelected?: string, onChange: (e: React.FormEvent<HTMLSelectElement>) => void }) {
-    const types = { "KDB": "Kdb", "KDB_STREAMING":"Kdb Streaming", "POSTGRES": "Postgres", "CLICKHOUSE": "Clickhouse", "MSSERVER": "Microsoft SQL Server", "H2": "H2", "MYSQL": "MySQL", "CUSTOM": "Customized JDBC Driver" };
+    // THis line was mostly generated in java (see JdbcTypesTest) then reorded to put KDB first.
+    const types = { "KDB": "Kdb","KDB_STREAMING": "Kdb_Streaming","MSSERVER": "Microsoft SQL Server","MYSQL": "MySQL","POSTGRES": "Postgres","REDIS": "Redis","APACHE_CALCITE_AVATICA": "Apache Calcite Avatica","APACHE_IGNITE": "Apache Ignite","APACHE_KYLIN": "Apache Kylin","KYUUBI_HIVE": "Apache Kyuubi","SPARK_HIVE": "Apache Spark","YANDEX_CLICKHOUSE": "ClickHouse (Yandex)","CLICKHOUSE_COM": "ClickHouse.com","CRATEDB": "CrateDB (Legacy)","CSVJDBC": "CSV","DB2_ISERIES": "Db2 for IBM i","DERBY": "Derby Embedded","DERBY_SERVER": "Derby Server","DOLPHINDB": "DolphinDB","DUCKDB": "DuckDB","ELASTICSEARCH": "Elasticsearch","GEMFIRE_XD": "Gemfire XD","H2": "H2","SAP_HANA": "HANA (Old)","HSQLDB_EMBEDDED": "HSQL Embedded","HSQLDB_SERVER": "HSQL Server","INFLUXDB": "InfluxDB","INFORMIX": "Informix","MONGODB": "MongoDB","MSACCESS_UCANACCESS": "MS Access (UCanAccess)","NEO4J": "Neo4j","NUODB": "NuoDB","OMNISCI": "OmniSci (formerly MapD)","ORACLE": "Oracle","PRESTO": "PrestoSQL","SNAPPYDATA": "SnappyData","SNOWFLAKE": "Snowflake","APACHE_SOLRJ": "Solr","SQLITE_JDBC": "SQLite","SQREAM": "SQream DB","TDENGINE": "TDengine","TERADATA": "Teradata","TRINO": "Trino", };
     return <>
         <FormGroup label="Type:" labelFor="connType" inline>
             <HTMLSelect onChangeCapture={props.onChange}>
@@ -310,7 +358,6 @@ export function AjaxResButton(props: { mystate: AjaxResult, succeededMsg?: strin
 
 export function ConnectionHelp(props: { addConn: (jc: jdbcConnection) => void }) {
     return <><div>
-        <h1>Help</h1>
         <h2>Create Connection:</h2>
         <p>Click on one of the below to create a connection using default settings on your local machine:</p>
         <div>
@@ -328,7 +375,7 @@ export function ConnectionHelp(props: { addConn: (jc: jdbcConnection) => void })
 function JdbcCoverPanel(props: { jdbcConn: jdbcConnection, addConn: (jc: jdbcConnection) => void }) {
     return <div className="floatbox" style={{ minWidth:"170px", minHeight:"90px", }}>
         <h4>{props.jdbcConn.niceName}</h4>
-        <p><img src={props.jdbcConn.img} width="80" height="80" alt={props.jdbcConn.niceName + " logo"} /></p>
+        <p><img src="/img/t.gif" height="64" width="64" className={"zu-"+props.jdbcConn.name.toLowerCase()} alt={props.jdbcConn.niceName + " logo"}  /></p>
         <p><Button small title="Add this connection." icon="add" onClick={() => props.addConn(props.jdbcConn)} >Add Connection</Button></p>
     </div>
 }
@@ -336,19 +383,54 @@ function JdbcCoverPanel(props: { jdbcConn: jdbcConnection, addConn: (jc: jdbcCon
 
 
 class jdbcConnection extends Enumify {
-    static KDB = new jdbcConnection("KDB", "Kdb", "database", "./img/kx.png", 5000, undefined, false);
-    static KDB_STREAMING = new jdbcConnection("KDB_STREAMING", "Kdb Subscription", "database", "./img/kx.png", 5000, undefined, false);
-    static POSTGRES = new jdbcConnection("POSTGRES", "Postgres", <SiPostgresql />, "./img/postgres-logo.png", 5432, "postgres");
-    static CLICKHOUSE = new jdbcConnection("CLICKHOUSE", "Clickhouse", "database", "./img/clickhouse-logo.png", 8123);
-    static MSSERVER = new jdbcConnection("MSSERVER", "Microsoft SQL Server", <DiMsqlServer />, "./img/mssql-logo.png", 1433, "sa");
-    static H2 = new jdbcConnection("H2", "H2", "database", "./img/h2-logo.png", 8082);
-    static MYSQL = new jdbcConnection("MYSQL", "MYSQL", <SiMysql />, "./img/mysql-logo.png", 3306, "root");
-    static CUSTOM = new jdbcConnection("CUSTOM", "Custom JDBC", "database", "./img/clickhouse-logo.png", 5000, undefined, false);
+    static CLICKHOUSE = new jdbcConnection("CLICKHOUSE", "Clickhouse", "jdbc:clickhouse://{host}:{port}/{database}", 8123);
+    static CUSTOM = new jdbcConnection("CUSTOM", "Custom JDBC Driver", "DriverUrlPrefixNotSpecified", 5000);
+    static KDB = new jdbcConnection("KDB", "Kdb", "jdbc:q:{host}:{port}", 5000);
+    static KDB_STREAMING = new jdbcConnection("KDB_STREAMING", "Kdb_Streaming", "jdbc:q:{host}:{port}", 5000);
+    static MSSERVER = new jdbcConnection("MSSERVER", "Microsoft SQL Server", "jdbc:sqlserver://{host}[:{port}][;databaseName={database}];trustServerCertificate=true", 1433);
+    static MYSQL = new jdbcConnection("MYSQL", "MySQL", "jdbc:mysql://{host}:{port}/{database}?allowMultiQueries=true", 3306);
+    static POSTGRES = new jdbcConnection("POSTGRES", "Postgres", "jdbc:postgresql://{host}:{port}/{database}?", 5432);
+    static REDIS = new jdbcConnection("REDIS", "Redis", "jdbc:redis://{host}:{port}[/{database}]", 6379);
+    static APACHE_CALCITE_AVATICA = new jdbcConnection("APACHE_CALCITE_AVATICA", "Apache Calcite Avatica", "jdbc:avatica:remote:url=http://{host}:{port}/druid/v2/sql/avatica/", 8082);
+    static APACHE_IGNITE = new jdbcConnection("APACHE_IGNITE", "Apache Ignite", "jdbc:ignite:thin://{host}[:{port}][;schema={database}]", 1000);
+    static APACHE_KYLIN = new jdbcConnection("APACHE_KYLIN", "Apache Kylin", "jdbc:kylin://{host}:{port}/{database}", 443);
+    static KYUUBI_HIVE = new jdbcConnection("KYUUBI_HIVE", "Apache Kyuubi", "jdbc:hive2://{host}[:{port}][/{database}]", 10009);
+    static SPARK_HIVE = new jdbcConnection("SPARK_HIVE", "Apache Spark", "jdbc:hive2://{host}[:{port}][/{database}]", 10000);
+    static YANDEX_CLICKHOUSE = new jdbcConnection("YANDEX_CLICKHOUSE", "ClickHouse (Yandex)", "jdbc:clickhouse://{host}:{port}[/{database}]", 8123);
+    static CLICKHOUSE_COM = new jdbcConnection("CLICKHOUSE_COM", "ClickHouse.com", "jdbc:ch:{host}:{port}[/{database}]", 8123);
+    static CRATEDB = new jdbcConnection("CRATEDB", "CrateDB (Legacy)", "crate://{host}[:{port}]/", 5432);
+    static CSVJDBC = new jdbcConnection("CSVJDBC", "CSV", "jdbc:relique:csv:{folder}", 0);
+    static DB2_ISERIES = new jdbcConnection("DB2_ISERIES", "Db2 for IBM i", "jdbc:as400://{host};[libraries={database};]", 446);
+    static DERBY = new jdbcConnection("DERBY", "Derby Embedded", "jdbc:derby:{folder}", 0);
+    static DERBY_SERVER = new jdbcConnection("DERBY_SERVER", "Derby Server", "jdbc:derby://{host}:{port}/{database};create=false", 1527);
+    static DOLPHINDB = new jdbcConnection("DOLPHINDB", "DolphinDB", "jdbc:dolphindb://{host}:{port}", 9200);
+    static DUCKDB = new jdbcConnection("DUCKDB", "DuckDB", "jdbc:duckdb:{file}", 0);
+    static ELASTICSEARCH = new jdbcConnection("ELASTICSEARCH", "Elasticsearch", "jdbc:es://{host}:{port}/", 9200);
+    static GEMFIRE_XD = new jdbcConnection("GEMFIRE_XD", "Gemfire XD", "jdbc:gemfirexd://{host}[:{port}]/", 1527);
+    static H2 = new jdbcConnection("H2", "H2", "jdbc:h2:tcp://{server}[:{port}]", 8082);
+    static SAP_HANA = new jdbcConnection("SAP_HANA", "HANA (Old)", "jdbc:sap://{host}[:{port}]", 30015);
+    static HSQLDB_EMBEDDED = new jdbcConnection("HSQLDB_EMBEDDED", "HSQL Embedded", "jdbc:hsqldb:file:{folder}", 0);
+    static HSQLDB_SERVER = new jdbcConnection("HSQLDB_SERVER", "HSQL Server", "jdbc:hsqldb:hsql://{host}[:{port}]/[{database}]", 9001);
+    static INFLUXDB = new jdbcConnection("INFLUXDB", "InfluxDB", "jdbc:arrow-flight-sql://{host}:{port}?disableCertificateVerification=true[&database={database}]", 27017);
+    static INFORMIX = new jdbcConnection("INFORMIX", "Informix", "jdbc:informix-sqli://{host}:{port}/{database}:INFORMIXSERVER={server}", 1533);
+    static MONGODB = new jdbcConnection("MONGODB", "MongoDB", "jdbc:mongodb://{host}[:{port}][/{database}]", 27017);
+    static MSACCESS_UCANACCESS = new jdbcConnection("MSACCESS_UCANACCESS", "MS Access (UCanAccess)", "jdbc:ucanaccess://{file}", 0);
+    static NEO4J = new jdbcConnection("NEO4J", "Neo4j", "jdbc:neo4j:bolt://{host}[:{port}]/", 7687);
+    static NUODB = new jdbcConnection("NUODB", "NuoDB", "jdbc:com.nuodb://{host}[:{port}]/[{database}]", 2000);
+    static OMNISCI = new jdbcConnection("OMNISCI", "OmniSci (formerly MapD)", "jdbc:omnisci:{host}:{port}:{database}", 6274);
+    static PRESTO = new jdbcConnection("PRESTO", "PrestoSQL", "jdbc:presto://{host}:{port}[/{database}]", 8080);
+    static SNAPPYDATA = new jdbcConnection("SNAPPYDATA", "SnappyData", "jdbc:snappydata://{host}[:{port}]/", 1528);
+    static SNOWFLAKE = new jdbcConnection("SNOWFLAKE", "Snowflake", "jdbc:snowflake://{host}[:port]/?[db={database}]", 443);
+    static APACHE_SOLRJ = new jdbcConnection("APACHE_SOLRJ", "Solr", "jdbc:solr://{host}:{port}/[?collection={database}]", 9983);
+    static SQLITE_JDBC = new jdbcConnection("SQLITE_JDBC", "SQLite", "jdbc:sqlite:{file}", 0);
+    static SQREAM = new jdbcConnection("SQREAM", "SQream DB", "jdbc:Sqream://{host}:{port}/{database};cluster=true", 3108);
+    static TDENGINE = new jdbcConnection("TDENGINE", "TDengine", "jdbc:TAOS-RS://{host}:{port}/[{database}]", 6041);
+    static TERADATA = new jdbcConnection("TERADATA", "Teradata", "jdbc:teradata://{host}/DATABASE={database},DBS_PORT={port}", 1025);
+    static TRINO = new jdbcConnection("TRINO", "Trino", "jdbc:trino://{host}:{port}[/{database}]", 8080);
+
     static _ = jdbcConnection.closeEnum();
 
-    constructor(readonly name: string, readonly niceName: string, readonly icon: IconName | MaybeElement,
-        readonly img: string, readonly defaultPort: number, readonly defaultUsername: string | undefined = undefined,
-        readonly databaseRequired: boolean = true) {
+    constructor(readonly name: string, readonly niceName: string, readonly exampleURL: string, readonly defaultPort: number) {
         super();
     }
 }

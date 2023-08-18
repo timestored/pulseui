@@ -1,3 +1,29 @@
+/*******************************************************************************
+ *
+ *   $$$$$$$\            $$\                     
+ *   $$  __$$\           $$ |                     
+ *   $$ |  $$ |$$\   $$\ $$ | $$$$$$$\  $$$$$$\   
+ *   $$$$$$$  |$$ |  $$ |$$ |$$  _____|$$  __$$\  
+ *   $$  ____/ $$ |  $$ |$$ |\$$$$$$\  $$$$$$$$ |  
+ *   $$ |      $$ |  $$ |$$ | \____$$\ $$   ____|  
+ *   $$ |      \$$$$$$  |$$ |$$$$$$$  |\$$$$$$$\  
+ *   \__|       \______/ \__|\_______/  \_______|
+ *
+ *  Copyright c 2022-2023 TimeStored
+ *
+ *  Licensed under the Reciprocal Public License RPL-1.5
+ *  You may obtain a copy of the License at
+ *
+ *  https://opensource.org/license/rpl-1-5/
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ ******************************************************************************/
+ 
 import { Button, ButtonGroup, Checkbox,   HTMLSelect,  HTMLTable, Icon, IconName, MaybeElement, MenuItem, NumericInput, Radio, RadioGroup, Slider, TextArea } from '@blueprintjs/core';
 import { DateInput2, DateRange, DateRangeInput2 } from '@blueprintjs/datetime2';
 import moment from 'moment';
@@ -99,7 +125,7 @@ export default class AForm extends Component<WidgetProperties<AFormState>,AFormS
         this.state = { ...this.state,...this.props.savedState};
         this.state.formWidgets.forEach((fw,idx) => {
             fw.uQueryable = new UpdatingQueryable(this.props.serverConfigs, this.props.queryEngine, this.getUpdateStateListener(fw.id), this.state.queryables[idx]);
-            fw.srs = (!fw.srs || fw.srs === undefined) ? EmptySmartRs : fw.srs; // was removed on savedown, so set to empty to prevent errors.
+            fw.srs = EmptySmartRs; // was removed on savedown, so set to empty to prevent errors.
             // Action handlers were added later so saved instances may not have them.
             const def = getDefaultActionHandler(this.props.serverConfigs, "Change");
             fw.actionHandlers =  (!fw.actionHandlers || fw.actionHandlers === undefined) ? [def] : fw.actionHandlers.map(c => merge(clone(def), c));
@@ -107,20 +133,21 @@ export default class AForm extends Component<WidgetProperties<AFormState>,AFormS
         this.props.setConfigSaver(() => {
             // We don't want to save full queryable state or cached srs as they can be very large.
             // Be careful, don't even cloneDeep the full SRS as it causes stack depth exceptions.
-            let queryables = this.state.formWidgets.map(fw => fw.uQueryable?.queryable);
-            let formWidgets = this.state.formWidgets.map(fw => cloneDeep(omit(fw,['uQueryable','srs'])));
-            let r = { ...cloneDeep(omit(this.state,['queryables','formWidgets'])), queryables:queryables, formWidgets:formWidgets};
+            const queryables = this.state.formWidgets.map(fw => fw.uQueryable?.queryable);
+            const formWidgets = this.state.formWidgets.map(fw => cloneDeep(omit(fw,['uQueryable','srs'])));
+            const r = { ...cloneDeep(omit(this.state,['queryables','formWidgets'])), queryables:queryables, formWidgets:formWidgets};
             return r;
         });
     }
 
     addFW = (ftype:guiType) => {
-        let formWidgets = this.state.formWidgets.concat(this.newFormWidget(ftype));
+        const formWidgets = this.state.formWidgets.concat(this.newFormWidget(ftype));
         this.setState({formWidgets, selectedIndex:formWidgets.length-1});
     }
 
     getUpdateStateListener = (id:number) => {
           // start listening
+          // eslint-disable-next-line @typescript-eslint/no-this-alias
           const OUTER = this;
           const uqListener:UpdatingQueryableListener = {
               update(srs,exception) {
@@ -144,7 +171,7 @@ export default class AForm extends Component<WidgetProperties<AFormState>,AFormS
         let maxId = 0;
         this.state.formWidgets.forEach(fw => maxId = fw.id > maxId ? fw.id : maxId);
         maxId++;
-        let uQueryable = new UpdatingQueryable(this.props.serverConfigs, this.props.queryEngine, this.getUpdateStateListener(maxId));
+        const uQueryable = new UpdatingQueryable(this.props.serverConfigs, this.props.queryEngine, this.getUpdateStateListener(maxId));
         const key = (ftype === "datepicker" ? "myDate" : (ftype === "slider" ? "myNumber" : (ftype === "submit" ? "submit_" : "key"))) + maxId;
         const optionsList = ["nyc|New York|United States","ldn|London|United Kingdom","washington|Washington, D.C.|United States","beijing|Beijing|China","delhi|New Delhi|India"];
         return {id:maxId, 
@@ -158,7 +185,7 @@ export default class AForm extends Component<WidgetProperties<AFormState>,AFormS
         if(selIdx === undefined) {
             return false;
         }
-        let newPos = selIdx + direction;
+        const newPos = selIdx + direction;
         return newPos >= 0 && newPos < this.state.formWidgets.length;
     }
     
@@ -166,9 +193,9 @@ export default class AForm extends Component<WidgetProperties<AFormState>,AFormS
         if(selIdx === undefined) {
             return false;
         }
-        let newPos = selIdx + direction;
-        let newWidgets = this.state.formWidgets.slice(0);
-        let newW = newWidgets[newPos];
+        const newPos = selIdx + direction;
+        const newWidgets = this.state.formWidgets.slice(0);
+        const newW = newWidgets[newPos];
         newWidgets[newPos] = newWidgets[selIdx];
         newWidgets[selIdx] = newW;
         this.setState({formWidgets:newWidgets, selectedIndex:newPos});
@@ -178,13 +205,13 @@ export default class AForm extends Component<WidgetProperties<AFormState>,AFormS
         if(selIdx === undefined) {
             return;
         }
-        let formWidgets = this.state.formWidgets.filter((e,i) => i !== this.state.selectedIndex);
+        const formWidgets = this.state.formWidgets.filter((e,i) => i !== this.state.selectedIndex);
         const selectedIndex = formWidgets.length === 0 ? undefined : (selIdx <= formWidgets.length-1 ? selIdx : selIdx-1);
         this.setState({formWidgets, selectedIndex});
     }
 
     modify = (selIdx:number, formWidgetUpdate:Partial<FormWidet>) => {
-        let formWidgets = this.state.formWidgets.slice(0);
+        const formWidgets = this.state.formWidgets.slice(0);
         if(selIdx === undefined || formWidgets[selIdx] === undefined) {
             return;
         }
@@ -224,7 +251,7 @@ export default class AForm extends Component<WidgetProperties<AFormState>,AFormS
     }
     
     factory(formWidget:FormWidet) {
-        let args = this.props.queryEngine.argMap[formWidget.key];
+        const args = this.props.queryEngine.argMap[formWidget.key];
         let options = Array<IOptionRow>();
         if(formWidget.useHardcoded) {
             options = formWidget.optionsList ? toOptionRows(formWidget.optionsList) : [];
@@ -235,12 +262,12 @@ export default class AForm extends Component<WidgetProperties<AFormState>,AFormS
             return guiType === "slider" ? "number" : (guiType === "drop" || guiType === "radio" || guiType === "aftext"|| guiType === "textarea") ? "string" : guiType === "datepicker" ? "date" : "strings";
         }
         // If the widget only allows one choice, choose any option to allow displaying something
-        let oneChoiceWidget = formWidget.guiType === "radio" || formWidget.guiType === "drop";
+        const oneChoiceWidget = formWidget.guiType === "radio" || formWidget.guiType === "drop";
         if(oneChoiceWidget && args === undefined && options.length>0) {
             this.props.queryEngine.setArg(formWidget.key, [options[0].val], guiTypeToArgType(formWidget.guiType));
         }
 
-        let props = { 
+        const props = { 
             onArgSelected:(e:string[])=>{
                 this.props.queryEngine.setArg(formWidget.key, e, guiTypeToArgType(formWidget.guiType));
                 const ahs = formWidget.actionHandlers.filter(ah => ah.trigger === "Change");
@@ -265,7 +292,7 @@ export default class AForm extends Component<WidgetProperties<AFormState>,AFormS
 
     // FormTypeSelect = (props:{jdbcTypeSelected?:string, onChange:(e:React.FormEvent<HTMLSelectElement>)=>void}) => {
     FormTypeSelect = (props:{selected:guiType, onChange:(e:guiType)=>void}) => {
-        let myGooType = (GooType.enumValueOf(props.selected) as GooType);
+        const myGooType = (GooType.enumValueOf(props.selected) as GooType);
         return <div>
         {/*  */}
             {props.selected === "submit" ?
@@ -458,8 +485,8 @@ const ASlider = (props:ASelectCallback) => {
     if(stepSize > 2) {
         stepSize = Math.floor(stepSize);
     }
-    let sz = stepSize === 0 ? undefined : stepSize;
-    let lblSize = sz === undefined ? undefined : sz * 5;
+    const sz = stepSize === 0 ? undefined : stepSize;
+    const lblSize = sz === undefined ? undefined : sz * 5;
     console.log("stepSize=" + sz);
     const value = (props.args && props.args.length>0) ? parseFloat(props.args[0]) : 0;
     const [val,setValue] = useState(value);
@@ -477,13 +504,13 @@ const ASubmit = (props:{label?:string} &ASelectCallback) => {
 
 function toOptionRows(optionsList:string[]):Array<IOptionRow> {
     return optionsList.map(s => {
-        let a = s.split("|");
+        const a = s.split("|");
         return {val:a[0], niceName:a.length>1 ? a[1] : undefined, label:a.length>2 ? a[2] : undefined};
     });
 }
     
 function toOptionRowsFromRs(srs:SmartRs):Array<IOptionRow> {
-    let ks = Object.keys(srs.rsdata.tbl.types);
+    const ks = srs.getColumnNames();
     if(ks.length > 0) {
         return srs.rsdata.tbl.data.map(r => {return { val:""+r[ks[0]], niceName:ks[1] && ""+r[ks[1]], label:ks[2] && ""+r[ks[2]] }});
     }

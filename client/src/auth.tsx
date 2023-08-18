@@ -1,3 +1,29 @@
+/*******************************************************************************
+ *
+ *   $$$$$$$\            $$\                     
+ *   $$  __$$\           $$ |                     
+ *   $$ |  $$ |$$\   $$\ $$ | $$$$$$$\  $$$$$$\   
+ *   $$$$$$$  |$$ |  $$ |$$ |$$  _____|$$  __$$\  
+ *   $$  ____/ $$ |  $$ |$$ |\$$$$$$\  $$$$$$$$ |  
+ *   $$ |      $$ |  $$ |$$ | \____$$\ $$   ____|  
+ *   $$ |      \$$$$$$  |$$ |$$$$$$$  |\$$$$$$$\  
+ *   \__|       \______/ \__|\_______/  \_______|
+ *
+ *  Copyright c 2022-2023 TimeStored
+ *
+ *  Licensed under the Reciprocal Public License RPL-1.5
+ *  You may obtain a copy of the License at
+ *
+ *  https://opensource.org/license/rpl-1-5/
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ ******************************************************************************/
+ 
 import { Button, Card, Elevation, H3, Label } from "@blueprintjs/core";
 import axios from "axios";
 import { get } from "lodash-es";
@@ -19,26 +45,26 @@ export async function signin(username: string, password:string, callback: (lr:un
     console.error("Could not login." + e)
   })
   callback(undefined);
-};
+}
 
 
 export function LoginPage(props:{logincallBack:(lr:LoginResponse) => void}) {
-    let navigate = useNavigate();
-    let location = useLocation();
+    const navigate = useNavigate();
+    const location = useLocation();
     const themeContext = useContext(ThemeContext);
 
     // @ts-ignore
-    let from = location.state?.from?.pathname || "/dash"; // @ts-ignore
-    let search = location.state?.from?.search || ""; 
+    const from = location.state?.from?.pathname || "/dash"; // @ts-ignore
+    const search = location.state?.from?.search || ""; 
       
 	// Allows login via args in URL to that screenshotting can work.
-    let sp = new URLSearchParams(search);
+    const sp = new URLSearchParams(search);
     if(sp.get("sd_offerId") !== null) {
       window.localStorage.setItem('offerId', sp.get("sd_offerId")!);
     }
     if(sp.get("sd_u") !== null && sp.get("sd_p") !== null) {
-        let u = sp.get("sd_u")!;
-        let p = sp.get("sd_p")!;
+        const u = sp.get("sd_u")!;
+        const p = sp.get("sd_p")!;
         signin(u, p, lr => { 
           lr !== undefined && props.logincallBack(lr); 
           let hr = window.location.href;
@@ -70,9 +96,9 @@ export function LoginPage(props:{logincallBack:(lr:LoginResponse) => void}) {
     function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
       event.preventDefault();
   
-      let formData = new FormData(event.currentTarget);
-      let username = formData.get("username") as string;
-      let password = formData.get("password") as string;
+      const formData = new FormData(event.currentTarget);
+      const username = formData.get("username") as string;
+      const password = formData.get("password") as string;
   
       signin(username, password, (lr) => {
         // Send them back to the page they tried to visit when they were

@@ -1,3 +1,29 @@
+/*******************************************************************************
+ *
+ *   $$$$$$$\            $$\                     
+ *   $$  __$$\           $$ |                     
+ *   $$ |  $$ |$$\   $$\ $$ | $$$$$$$\  $$$$$$\   
+ *   $$$$$$$  |$$ |  $$ |$$ |$$  _____|$$  __$$\  
+ *   $$  ____/ $$ |  $$ |$$ |\$$$$$$\  $$$$$$$$ |  
+ *   $$ |      $$ |  $$ |$$ | \____$$\ $$   ____|  
+ *   $$ |      \$$$$$$  |$$ |$$$$$$$  |\$$$$$$$\  
+ *   \__|       \______/ \__|\_______/  \_______|
+ *
+ *  Copyright c 2022-2023 TimeStored
+ *
+ *  Licensed under the Reciprocal Public License RPL-1.5
+ *  You may obtain a copy of the License at
+ *
+ *  https://opensource.org/license/rpl-1-5/
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ ******************************************************************************/
+ 
 import { Component } from 'react';
 import { getSmartRs, SmartRs } from './chartResultSet';
 
@@ -9,7 +35,7 @@ import { getSmartRs, SmartRs } from './chartResultSet';
  * some strategies may choose to entirely redraw the component others may append data.
  */
 export default interface ViewStrategy {
-	    
+
 		/**
 	     * For the given data, give us a panel with a view of that data if possible.
 	     * @return a panel showing qtab if possible otherwise false.
@@ -72,8 +98,8 @@ class TestCase {
     constructor(readonly kdbQuery:string, readonly name:string, readonly srs:SmartRs){}
 }
 
-enum JdbcTypes { KDB,POSTGRES,CLICKHOUSE,CUSTOM,MSSERVER,H2,MYSQL }
-
+// THis line was generated in java (see JdbcTypesTest) 
+enum JdbcTypes { CLICKHOUSE,CUSTOM,KDB,KDB_STREAMING,MSSERVER,MYSQL,POSTGRES,REDIS,APACHE_CALCITE_AVATICA,APACHE_IGNITE,APACHE_KYLIN,KYUUBI_HIVE,SPARK_HIVE,YANDEX_CLICKHOUSE,CLICKHOUSE_COM,CRATEDB,CSVJDBC,DB2_ISERIES,DERBY,DERBY_SERVER,DOLPHINDB,DUCKDB,ELASTICSEARCH,GEMFIRE_XD,H2,SAP_HANA,HSQLDB_EMBEDDED,HSQLDB_SERVER,INFLUXDB,INFORMIX,MONGODB,MSACCESS_UCANACCESS,NEO4J,NUODB,OMNISCI,ORACLE,PRESTO,SNAPPYDATA,SNOWFLAKE,APACHE_SOLRJ,SQLITE_JDBC,SQREAM,TDENGINE,TERADATA,TRINO, }
 
 export class ExampleTestCases {    
     
@@ -86,7 +112,7 @@ export class ExampleTestCases {
         const LIFE_EXP = [ 77.14, 72.22, 80.93, 78.42, 78.16, 39.01, 61.33, 51.01, 70.05];
     
 
-        function toQ(nums:number[]):String {
+        function toQ(nums:number[]):string {
             let r = "";
             nums.forEach(s => r += s + " ");
             return r;
@@ -97,39 +123,39 @@ export class ExampleTestCases {
             return r;
         }	
 
-		let countryCol =  " Country:" + toQsym(COUNTRIES) + "; ";
-		let numCols = "\r\n\t Population:" + toQ(POPULATION) + 
+		const countryCol =  " Country:" + toQsym(COUNTRIES) + "; ";
+		const numCols = "\r\n\t Population:" + toQ(POPULATION) + 
 				";\r\n\t GDP:" + toQ(GDP) +  
 				"; \r\n\tGDPperCapita:" + toQ(GDP_PER_CAPITA) + 
 				";  \r\n\tLifeExpectancy:" + toQ(LIFE_EXP) + ")";
 
-		let countryQuery = "([] Continent:" + toQsym(CONTINENT) + ";\r\n\t" + countryCol + numCols;
-		let colTitles = ["Continent", "Country", "Population", "GDP", "GDPperCapita", "LifeExpectancy"];
-		let colValues = [CONTINENT, COUNTRIES, POPULATION, GDP, GDP_PER_CAPITA, LIFE_EXP];
-		let rs = getSmartRs(colTitles, colValues);
+		const countryQuery = "([] Continent:" + toQsym(CONTINENT) + ";\r\n\t" + countryCol + numCols;
+		const colTitles = ["Continent", "Country", "Population", "GDP", "GDPperCapita", "LifeExpectancy"];
+		const colValues = [CONTINENT, COUNTRIES, POPULATION, GDP, GDP_PER_CAPITA, LIFE_EXP];
+		const rs = getSmartRs(colTitles, colValues);
 		return ExampleTestCases.COUNTRY_STATS = new TestCase(countryQuery, "COUNTRY_STATS", rs);
       })();
 
 
-	  public static OHLC_TESTCASE:TestCase = (function() {
+	public static OHLC_TESTCASE:TestCase = (function() {
         const DATES = "2024.03.17 2024.03.18 2024.03.19 2024.03.20 2024.03.21 2024.03.24 2024.03.25 2024.03.26 2024.03.27 2024.03.28 2024.03.31 2024.04.01 2024.04.02 2024.04.03 2024.04.04 2024.04.07 2024.04.08 2024.04.09 2024.04.10 2024.04.11 2024.04.14 2024.04.15 2024.04.16 2024.04.17 2024.04.18 2024.04.21 2024.04.22 2024.04.23 2024.04.24 2024.04.25".split(" ");
         const VOL = [3,9,6,5,4,7,8,2,13,3,9,6,5,4,7,8,2,13,3,9,6,5,4,7,8,2,13,3,9,6];
         const CLOSE = Array(30).fill(0).map((e, idx) => 55 + idx * 2);
 		const OPEN = Array(30).fill(0).map((e, idx) => 60 + idx);
     
-		let ohlcvQuery = "{ c:55+2*til 30; ([] t:`$string raze 2024.03.17+(7*til 6)+\\:til 5; high:c+30; low:c-20; open:60+til 30; close:c; volume:30#3 9 6 5 4 7 8 2 13) }[]";
-		let colTitles = ["Date", "Open", "High", "Low", "Close", "Volume"];
-		let colValues = [DATES, OPEN, CLOSE.map(e => e+30), CLOSE.map(e => e - 20),  CLOSE, VOL];
-		let rs = getSmartRs(colTitles, colValues);
+		const ohlcvQuery = "{ c:55+2*til 30; ([] t:`$string raze 2024.03.17+(7*til 6)+\\:til 5; high:c+30; low:c-20; open:60+til 30; close:c; volume:30#3 9 6 5 4 7 8 2 13) }[]";
+		const colTitles = ["Date", "Open", "High", "Low", "Close", "Volume"];
+		const colValues = [DATES, OPEN, CLOSE.map(e => e+30), CLOSE.map(e => e - 20),  CLOSE, VOL];
+		const rs = getSmartRs(colTitles, colValues);
 		return ExampleTestCases.OHLC_TESTCASE = new TestCase(ohlcvQuery, "OHLC", rs);
       })();
 
-	  public static CALENDAR_TESTCASE:TestCase = (function() {
-		const DATES = Array(365).fill(new Date()).map((e, idx) => { let d = new Date(); d.setDate(e.getDate() + idx); return d});
+	public static CALENDAR_TESTCASE:TestCase = (function() {
+		const DATES = Array(365).fill(new Date()).map((e, idx) => { const d = new Date(); d.setDate(e.getDate() + idx); return d});
         const VAL = Array(365).fill(0).map((e, idx) => 55 + idx * 2);
     
-		let calendarQuery = "([] dt:2023.12.31 - til 730; v:(asc 730?50)+(730?50)+730#90 80 72 83 40 2 3)";
-		let rs = getSmartRs(["Date", "Val"], [DATES, VAL]);
+		const calendarQuery = "([] dt:2023.12.31 - til 730; v:(asc 730?50)+(730?50)+730#90 80 72 83 40 2 3)";
+		const rs = getSmartRs(["Date", "Val"], [DATES, VAL]);
 		return ExampleTestCases.CALENDAR_TESTCASE = new TestCase(calendarQuery, "OHLC", rs);
       })();
     

@@ -1,5 +1,32 @@
+/*******************************************************************************
+ *
+ *   $$$$$$$\            $$\                     
+ *   $$  __$$\           $$ |                     
+ *   $$ |  $$ |$$\   $$\ $$ | $$$$$$$\  $$$$$$\   
+ *   $$$$$$$  |$$ |  $$ |$$ |$$  _____|$$  __$$\  
+ *   $$  ____/ $$ |  $$ |$$ |\$$$$$$\  $$$$$$$$ |  
+ *   $$ |      $$ |  $$ |$$ | \____$$\ $$   ____|  
+ *   $$ |      \$$$$$$  |$$ |$$$$$$$  |\$$$$$$$\  
+ *   \__|       \______/ \__|\_______/  \_______|
+ *
+ *  Copyright c 2022-2023 TimeStored
+ *
+ *  Licensed under the Reciprocal Public License RPL-1.5
+ *  You may obtain a copy of the License at
+ *
+ *  https://opensource.org/license/rpl-1-5/
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ ******************************************************************************/
+ 
 // File copy paste based on https://github.com/juliencrn/usehooks-ts for only the parts i need i.e. https://usehooks-ts.com/react-hook/use-local-storage
 // With added flag listenToAllWindows
+import { isEqual } from 'lodash-es';
 import { Dispatch, RefObject, SetStateAction, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
@@ -100,7 +127,21 @@ function useEventListener<K extends keyof WindowEventMap>(
     return item ? (parseJSON(item) as T) : defaultValue;
   }
 
-  function useLocalStorage<T>(key: string, initialValue: T, listenToAllWindows:boolean = true): [T, SetValue<T>] {
+  
+  export function useCacheThenUpdate<T>(key: string, initialValue: T, getValue:()=>Promise<T>, catchHandler:(reason:any)=>void): [T, SetValue<T>, ()=>void] {
+    const [storedValue, setValue] = useLocalStorage(key, initialValue, true);
+    useEffect(() => {
+      getValue()
+        .then(v => { if(!isEqual(v,storedValue)) { setValue(v) }})
+        .catch(reason => catchHandler(reason));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+    
+    async function refresh() { getValue().then(d => setValue(d)); }
+    return [storedValue, setValue, refresh];
+  }
+
+  function useLocalStorage<T>(key: string, initialValue: T, listenToAllWindows = true): [T, SetValue<T>] {
     // Get from local storage then
     // parse stored json or return initialValue
     const readValue = useCallback((): T => {

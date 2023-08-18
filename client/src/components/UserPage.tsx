@@ -1,3 +1,29 @@
+/*******************************************************************************
+ *
+ *   $$$$$$$\            $$\                     
+ *   $$  __$$\           $$ |                     
+ *   $$ |  $$ |$$\   $$\ $$ | $$$$$$$\  $$$$$$\   
+ *   $$$$$$$  |$$ |  $$ |$$ |$$  _____|$$  __$$\  
+ *   $$  ____/ $$ |  $$ |$$ |\$$$$$$\  $$$$$$$$ |  
+ *   $$ |      $$ |  $$ |$$ | \____$$\ $$   ____|  
+ *   $$ |      \$$$$$$  |$$ |$$$$$$$  |\$$$$$$$\  
+ *   \__|       \______/ \__|\_______/  \_______|
+ *
+ *  Copyright c 2022-2023 TimeStored
+ *
+ *  Licensed under the Reciprocal Public License RPL-1.5
+ *  You may obtain a copy of the License at
+ *
+ *  https://opensource.org/license/rpl-1-5/
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ ******************************************************************************/
+ 
 import { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { Number, String, Array, Record, Static, Boolean, Partial, Undefined } from 'runtypes';
@@ -32,16 +58,16 @@ export type User = {
 }
 
 export function convertUser(u: UserR): User {
-    let dateCreated = fromEpoch(u.dateCreated as unknown as number);
-    let dateUpdated = fromEpoch(u.dateUpdated as unknown as number);
-    let email = u.email && u.email.length>0 ? u.email : undefined;
-    let password = u.password && u.password.length>0 ? u.password : undefined;
+    const dateCreated = fromEpoch(u.dateCreated as unknown as number);
+    const dateUpdated = fromEpoch(u.dateUpdated as unknown as number);
+    const email = u.email && u.email.length>0 ? u.email : undefined;
+    const password = u.password && u.password.length>0 ? u.password : undefined;
     return { ...u, ...{ dateCreated, dateUpdated, email, password } };
 }
 
 // function convertToUserR(d: User): UserR {
-//     let dateCreated = toEpoch(d.dateCreated);
-//     let dateUpdated = toEpoch(d.dateUpdated);
+//     const dateCreated = toEpoch(d.dateCreated);
+//     const dateUpdated = toEpoch(d.dateUpdated);
 //     return { ...d, ...{ dateCreated, dateUpdated } };
 // }
 
@@ -49,7 +75,7 @@ async function getUsers() {
     const r = await axios.get<UserR[]>(SERVER + "/user");
     Array(UserRecord).check(r.data);
     return (r.data as unknown as UserR[]).map(d => convertUser(d));
-};
+}
 
 export default function UserPage() {
     const [users, setUsers] = useState<User[]>([]);
@@ -79,7 +105,7 @@ export default function UserPage() {
         fetchProcessUsers();
         analytics.track("User - Deleted: " + id);
         console.log("User - Deleted: " + id);
-    };
+    }
 
     if(!isAdmin(context)) {
         return <NonIdealState icon="error" title="You are not permitted on this page." ></NonIdealState>;

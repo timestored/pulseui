@@ -1,16 +1,41 @@
-import React, { Component, useContext, useEffect, useRef, useState } from 'react';
+/*******************************************************************************
+ *
+ *   $$$$$$$\            $$\                     
+ *   $$  __$$\           $$ |                     
+ *   $$ |  $$ |$$\   $$\ $$ | $$$$$$$\  $$$$$$\   
+ *   $$$$$$$  |$$ |  $$ |$$ |$$  _____|$$  __$$\  
+ *   $$  ____/ $$ |  $$ |$$ |\$$$$$$\  $$$$$$$$ |  
+ *   $$ |      $$ |  $$ |$$ | \____$$\ $$   ____|  
+ *   $$ |      \$$$$$$  |$$ |$$$$$$$  |\$$$$$$$\  
+ *   \__|       \______/ \__|\_______/  \_______|
+ *
+ *  Copyright c 2022-2023 TimeStored
+ *
+ *  Licensed under the Reciprocal Public License RPL-1.5
+ *  You may obtain a copy of the License at
+ *
+ *  https://opensource.org/license/rpl-1-5/
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ ******************************************************************************/
+ 
+import React, { Component, Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from 'react';
 import { SmartRs } from '../engine/chartResultSet';
-import QueryEngine, { getSensibleServer, Queryable, QueryableEditor, QueryEngineAdapter, SERVER } from './../engine/queryEngine';
-import { fetchProcessServers, ServerConfig } from './ConnectionsPage';
+import QueryEngine, { getSensibleServer, Queryable, QueryEngineAdapter, SERVER, ServerSelect } from './../engine/queryEngine';
+import { ServerConfig, useServerConfigs } from './ConnectionsPage';
 import { Button, Icon, IconName, NonIdealState, ProgressBar, Tree, TreeNodeInfo } from '@blueprintjs/core';
-import { ChartForm, ChartType, MyUpdatingChart, getH2DemoQueryable } from './ChartFactory';
+import { ChartForm, ChartType, MyUpdatingChart } from './ChartFactory';
 import { IThemeType, ThemeContext } from '../context';
 import { ChartWrapper } from '../styledComponents';
 import { IJsonModel, IJsonRowNode, Layout, Model, TabNode } from 'flexlayout-react';
 import { FlexContainer } from '../styledComponents';
 import { Link } from 'react-router-dom';
 import useLocalStorage from './hooks';
-import { isEqual } from 'lodash-es';
 import { useCallback } from 'react';
 import 'flexlayout-react/style/light.css';
 import '../dark.css';
@@ -18,25 +43,32 @@ import { DEFAULT_GLOBAL } from './FlexPanel';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { addParameter, getDefaultErrorFallback } from './CommonComponents';
 import { HiShare } from 'react-icons/hi';
-import { copyToClipboard } from './AGridContextMenu';
 import { notyf } from './../context';
 import { Array as RArray,String, Record, Static, Partial, Undefined } from 'runtypes';
 import axios from 'axios';
+import { SqlEditor } from './SqlEditor';
+import { useCacheThenUpdate } from './hooks';
+import { getH2DemoQueryable } from '../pro/ChartHelp';
+import { copyToClipboard } from './AGridContextMenu';
 
 
 export default function SqlEditorPage() {
-    useEffect(() => { document.title = "SQL Editor" }, []);
-    const [serverConfigs, setServerConfigs] = useLocalStorage<ServerConfig[]>("serverConfigs", [], false);
+    const [serverConfigs] = useServerConfigs();
+    const [selectedSC,setSelectedSC] = useState<ServerConfig|undefined>(undefined);
     
-    useEffect(() => {
-        fetchProcessServers((scs => { 
-            // WIthout this isEquals or If you add serverConfigs to useEffect [] it goes crazy and downloads repeatedly
-            if(!isEqual(scs, serverConfigs)) {
-                setServerConfigs(scs);
-            }
-        })); 
-    });
-    return <IdeFlexPanel serverConfigs={serverConfigs} />;
+    useEffect(() => { document.title = (selectedSC ? (selectedSC.name + " ") : "") + "SQL Editor" }, [selectedSC]);
+    useEffect(() => { 
+        if(selectedSC === undefined) {
+            setSelectedSC(getSensibleServer(serverConfigs)); 
+        }
+    },[serverConfigs,selectedSC]);
+    
+    if(!selectedSC || !serverConfigs || serverConfigs.length === 0) {
+        return <NonIdealState icon="error" title="No Connections found" 
+                        action={<div>Try  <Link to="/connections"><Button intent="primary">Adding Connections</Button></Link></div>} />;
+    }
+
+    return <IdeFlexPanel serverConfigs={serverConfigs} selectedSC={selectedSC} setSelectedSC={sc => setSelectedSC(sc)} />;
 }
 
 const ServerEntityR = Record({
@@ -49,82 +81,98 @@ const ServerEntityR = Record({
 }).And(Partial({
     info: String.Or(Undefined),
     db: String.Or(Undefined),
+    columns: String.Or(Undefined)
 }));
 export type ServerEntity = Static<typeof ServerEntityR>;
 
 function onlyUnique(value: any, idx: number, self: any) { return self.indexOf(value) === idx; }
 
-function toTree(ses:ServerEntity[], collapsed:string[]):TreeNodeInfo<ServerEntity>[] {
-    let serverNames = ses.map(s => s.server).filter(onlyUnique).sort(function (a, b) {
+function toTree(ses:ServerEntity[], collapsed:string[], selectedServerName:string, selectedSE:ServerEntity|undefined):TreeNodeInfo<ServerEntity>[] {
+    const serverNames = ses.map(s => s.server).filter(onlyUnique).sort(function (a, b) {
         return a.toLowerCase().localeCompare(b.toLowerCase());
     });
-    let namespaces = ses.map(s => s.namespace).filter(onlyUnique).sort();
+    const namespaces = ses.map(s => s.namespace).filter(onlyUnique).sort();
 
-    const toLeaf = (s:ServerEntity):TreeNodeInfo<ServerEntity> => { 
-        return {id: id++, label: s.fullName, icon: s.type === "table" ? "th" : "symbol-circle", nodeData:s, className:"entityNode", } 
+    const toLeaf = (s:ServerEntity, isSelected:boolean):TreeNodeInfo<ServerEntity> => { 
+        return {id: id++, label:<span title={s.columns ?? ""}>{s.name}</span>, icon: s.type === "table" ? "th" : "symbol-circle", nodeData:s, 
+                        className:"entityNode", isSelected:isSelected} 
     };
 
     let id = 0;
-    let t:TreeNodeInfo<ServerEntity>[] = serverNames.map(n => {
-        let serverEntities = ses.filter(s => s.server === n);
-        let childNodes:TreeNodeInfo<ServerEntity>[] = [];
+    const t:TreeNodeInfo<ServerEntity>[] = serverNames.map(n => {
+        const serverEntities = ses.filter(s => s.server === n);
+        const childNodes:TreeNodeInfo<ServerEntity>[] = [];
         namespaces.forEach(ns => {
-            let nsEntities = serverEntities.filter(s => s.namespace === ns).sort((a,b) => { 
+            const nsEntities = serverEntities.filter(s => s.namespace === ns).sort((a,b) => { 
                 return (a.type === "table" && b.type !== "table") ? -1 :
                     (b.type === "table" && a.type !== "table") ? 1 
                     : a.fullName.localeCompare(b.fullName); 
             });
+            function isSelected(aa:ServerEntity):boolean {
+                return selectedSE ? (selectedSE.fullName===aa.fullName && selectedSE.server===aa.server) : false;
+            }
             if(ns === ".") {
-                nsEntities.forEach(aa => childNodes.push(toLeaf(aa)));
+                nsEntities.forEach(aa => childNodes.push(toLeaf(aa, isSelected(aa))));
             } else {
                 const isExpanded = !collapsed.includes(n+"-"+ns);
                 childNodes.push({ 
-                    id: id++, hasCaret: true, label: ns, icon: isExpanded ? "folder-open" : "folder-close",  isExpanded:isExpanded, 
-                        nodeData:{name:n, server:n, namespace:ns, fullName:n+"-"+ns, type:"namespace", info:"", db:"", query:"" },  className:"namespaceNode",
-                        childNodes:nsEntities.map(aa => toLeaf(aa)),
+                    id: id++, hasCaret: true, label: ns, icon: isExpanded ? "folder-open" : "folder-close",  isExpanded:isExpanded,
+                        nodeData:{name:n, server:n, namespace:ns, fullName:n+"-"+ns, type:"namespace", info:"", db:"", query:"", columns:"" },  className:"namespaceNode ",
+                        childNodes:nsEntities.map(aa => toLeaf(aa, isSelected(aa))),
                  });
             }
         });
         
 
         return  { 
-            id: id++, hasCaret: true, label: n, icon: "data-connection",  isExpanded:!collapsed.includes(n), 
-                nodeData:{name:n, server:n, namespace:n, fullName:n, type:"server", info:"", db:"", query:"" },  className:"serverNode",
+            id: id++, hasCaret: true, label: n, icon: "data-connection",  isExpanded:!collapsed.includes(n),  isSelected:n === selectedServerName,
+                nodeData:{name:n, server:n, namespace:n, fullName:n, type:"server", info:"", db:"", query:"", columns:"" },  className:"serverNode",
                 childNodes:childNodes,
          };
     });
     return t;
 }
 
-function ServerTree(props:{queryEngine:QueryEngine, serverConfigs:ServerConfig[]}) {
-    const [ serverTree, setServerTree ] = useState([] as ServerEntity[]);
+
+export function useServerTree(): [serverTree:ServerEntity[], setServerTree:Dispatch<SetStateAction<ServerEntity[]>>, refresh:()=>void] {    
+    async function fetch() {
+        const r = await axios.get<ServerConfig[]>(SERVER + "/servertree");
+        const ses:ServerEntity[] = RArray(ServerEntityR).check(r.data)
+        return ses;
+    }
+    return useCacheThenUpdate<ServerEntity[]>("servertree", [], fetch, ()=>{});
+  }
+
+function ServerTree(props:{queryEngine:QueryEngine, serverConfigs:ServerConfig[], selectedSC:ServerConfig, setSelectedSC:(sc:ServerConfig)=>void}) {
+    const [ serverTree] = useServerTree();
+    const [ selectedSE,setSelectedSE] = useState<ServerEntity|undefined>(undefined);
     const [ collapsed, setCollapsed ] = useLocalStorage<string[]>("EditorCollapsedEntities",[]);
 
     useEffect(() => {
-        axios.get<ServerEntity[]>(SERVER + "/servertree")
-        .then(r => {
-            let ses:ServerEntity[] = RArray(ServerEntityR).check(r.data)
-            setServerTree(ses);
-            // Nicely hide things - always hide namespaces, sometimes hide servers if too many        
-            if(collapsed.length === 0) {
-                let serverNames = ses.map(s => s.server).filter(onlyUnique).sort();
-                let namespaceFullNames = ses.map(s => s.server + "-" + s.namespace).filter(onlyUnique).sort();
-                let collaps = namespaceFullNames;
-                if(ses.length > 20 && serverNames.length > 7) {
-                    collaps = [...serverNames, ...collaps];
-                }
-                setCollapsed(collaps);
+        if(collapsed.length === 0) {
+            const serverNames = serverTree.map(s => s.server).filter(onlyUnique).sort();
+            const namespaceFullNames = serverTree.map(s => s.server + "-" + s.namespace).filter(onlyUnique).sort();
+            let collaps = namespaceFullNames;
+            if(serverTree.length > 20 && serverNames.length > 7) {
+                collaps = [...serverNames, ...collaps];
             }
-        })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    },[]);
+            setCollapsed(collaps);
+        }
+    },[serverTree, collapsed.length, setCollapsed]);
 
-    let tree = toTree(serverTree, collapsed);
+    const tree = toTree(serverTree, collapsed, props.selectedSC.name, selectedSE);
 
     const handleClick = (node:TreeNodeInfo<ServerEntity>) => {
-        if(node.nodeData && node.nodeData?.type !== "server" && node.nodeData?.type !== "namespace") {
-            let d = node.nodeData;
-            props.queryEngine.sendQuery({query:d.query, serverName:d.server, refreshPeriod:0});
+        if(node.nodeData && node.nodeData.server) {
+            const sc = props.serverConfigs.find(sc => sc.name === node.nodeData!.server);
+            if(sc) {
+                props.setSelectedSC(sc);
+            }
+            if(node.nodeData?.type !== "server" && node.nodeData?.type !== "namespace") {
+                const d = node.nodeData;
+                setSelectedSE(d);
+                props.queryEngine.sendQuery({query:d.query, serverName:d.server, refreshPeriod:0, serverCmd:""});
+            }
         }
     }
     const handleCollapse = (node:TreeNodeInfo<ServerEntity>) => {
@@ -137,15 +185,22 @@ function ServerTree(props:{queryEngine:QueryEngine, serverConfigs:ServerConfig[]
         onNodeExpand={node => {setCollapsed(collapsed.filter(n => n !== node.nodeData?.fullName))}} />;
 }
 
-function CodeEditor(props:{queryEngine:QueryEngine, serverConfigs:ServerConfig[]}) {
+function CodeEditor(props:{queryEngine:QueryEngine, serverConfigs:ServerConfig[], selectedSC:ServerConfig, setSelectedSC:(sc:ServerConfig)=>void}) {
     const [queryable, setQueryable] = useState<Queryable>();
     const [exception, setException] = useState<string | undefined>("");
     const [lastQuerySent, setLastQuerySent] = useState<string>("");
-    const { serverConfigs } = props;
+    const { serverConfigs, selectedSC } = props;
 
     useEffect(() => {
         const foo = new class extends QueryEngineAdapter {
-            tabChanged(queryable: Queryable, qTab: SmartRs): void { setException(""); }
+            tabChanged(queryable: Queryable, qTab: SmartRs, exceededMaxRows:boolean): void { 
+                if(exceededMaxRows) {
+                    notyf.error("Query result larger than maximum rows permitted.")
+                    setException("exceededMaxRows"); 
+                } else {
+                    setException("");
+                }
+            }
             queryError(queryable: Queryable, exception: string): void { setException(exception); }
         }();
         props.queryEngine.addListener(foo);
@@ -154,45 +209,39 @@ function CodeEditor(props:{queryEngine:QueryEngine, serverConfigs:ServerConfig[]
     
     useEffect(() => {
         if(serverConfigs.length>0 && queryable === undefined) {
-            let serverC = getSensibleServer(serverConfigs);
-            const serverName = serverC === undefined ? "" : serverC.name;
-            const serverType = serverC === undefined ? undefined : serverC.jdbcType;
-            
-            let sp = new URLSearchParams(window.location.search);
+            const sp = new URLSearchParams(window.location.search);
             let query = sp.get("qry");
             if(query === null) {
                 query = window.localStorage.getItem("sqlEditorPageQuery");
             }
             if(query === null) {
-                query = getDefaultQueryCode(serverType === "KDB");
+                query = getDefaultQueryCode(selectedSC.jdbcType === "KDB");
             }
 
-            setQueryable(new Queryable(serverName, query, -1));
+            setQueryable(new Queryable(selectedSC.name, query, -1));
         }
-    },[serverConfigs,queryable]);
+        if(queryable && queryable.serverName !== selectedSC.name) {
+            setQueryable({...queryable, serverName:selectedSC.name});
+        }
+    },[serverConfigs,queryable,selectedSC]);
 
     const sendQuery = useCallback((qr:Queryable) => {
-        let newq = {...queryable,...qr};
+        const newq = {...queryable,...qr};
         setException(undefined);
         setLastQuerySent(newq.query);
         props.queryEngine.sendQuery(newq);
     },[queryable,props.queryEngine]);
     
     
-    if(!serverConfigs || serverConfigs.length === 0) {
-        return <NonIdealState icon="error" title="No Connections found" 
-                        action={<div>Try  <Link to="/connections"><Button intent="primary">Adding Connections</Button></Link></div>} />;
-    }
-    
     const rightChildren = <>
         <Button small icon={<HiShare />} onClick={() => {
             const qcode = window.localStorage.getItem("sqlEditorPageQuery") ?? "";
-            let newUrl = addParameter(window.location.href,"qry",qcode);
+            const newUrl = addParameter(window.location.href,"qry",qcode);
             copyToClipboard(newUrl); 
             notyf.success("Shareable URL has been copied to your clipboard"); 
         }} >Share All Code</Button>
         <Button small icon={<HiShare />} disabled={lastQuerySent.length <= 0} onClick={() => {
-            let newUrl = addParameter(window.location.href,"qry",lastQuerySent);
+            const newUrl = addParameter(window.location.href,"qry",lastQuerySent);
             copyToClipboard(newUrl); 
             notyf.success("Shareable URL has been copied to your clipboard"); 
         }} >Share Latest Result</Button>
@@ -204,22 +253,38 @@ function CodeEditor(props:{queryEngine:QueryEngine, serverConfigs:ServerConfig[]
             {exception === undefined ?  <div style={{height:11}}><ProgressBar intent="primary" /></div> : <div style={{height:11}}></div>}
         </div>
         <div id="editor2"> 
-            {queryable && <QueryableEditor queryable={queryable} serverConfigs={serverConfigs} sendQuery={sendQuery} sendOnAnyChange={false}
-                showRefreshSelect={false} sendButtonText="Send Query" rightChildren={rightChildren} 
-                onChange={(t) => {window.localStorage.setItem("sqlEditorPageQuery", t)}} />}
+            {/* 
+                Notice this select/editor are very similar in layout to QueryableEditor
+                Not easy to reuse QueryableEditor, as it contains the Server Selected State. 
+                We wanted ServerSelect at higher level to allow clicking server in tree to cause server select as well.
+            */}
+            {queryable && <div>
+                <div className="QueryableEditorControls">
+                    <ServerSelect selectedServer={props.selectedSC.name} serverOptions={props.serverConfigs} 
+                        onSelect={e => { 
+                            const sc = props.serverConfigs.find(sc => sc.name === e);
+                            if(sc) { props.setSelectedSC(sc); }
+                        }} />
+                    {rightChildren}
+                </div>
+                <SqlEditor runLine={t => sendQuery({...queryable, query:t})}  runSelection={t => sendQuery({...queryable, query:t})} 
+                            value={queryable.query}  onChange={t => setQueryable({...queryable, query:t})} />
+            </div>}
+        
         </div>
     </div>
 }
 
 type EditorType = "editorv"|"chartv"|"treev"|"jsonv"|"tablev"|"consolev";
 
-function IdeFlexPanel(props:{serverConfigs:ServerConfig[]}) {
-
+function IdeFlexPanel(props:{serverConfigs:ServerConfig[], selectedSC:ServerConfig, setSelectedSC:(sc:ServerConfig)=>void}) {
     const queryEngine = useRef<QueryEngine | null>(null);
 
     useEffect(() => {
-        queryEngine.current = new QueryEngine(null, false);    
-        return () => { queryEngine?.current?.shutDown(); };
+        queryEngine.current = new QueryEngine(null, false);
+        return () => { 
+            queryEngine?.current?.shutDown(); 
+        };
     },[]);
     
     // If you change the layout json you MUST change the name of the localStorage else the component won't show
@@ -231,7 +296,7 @@ function IdeFlexPanel(props:{serverConfigs:ServerConfig[]}) {
         },
         { type: "tabset", weight: 50, 
             children: [{ type: "tab", name: "Table", component: "tablev", },
-                       { type: "tab", name: "JSON1", component: "jsonv", },
+                    //    { type: "tab", name: "JSON1", component: "jsonv", },
                        { type: "tab", name: "Console", component: "consolev", },
                        { type: "tab", name: "Chart", component: "chartv", },] 
         }
@@ -247,16 +312,16 @@ function IdeFlexPanel(props:{serverConfigs:ServerConfig[]}) {
 
     // To ensure height/width stretch within flexlayout, the first and only div should have heigh:100% i.e. use chartwrapper
     const factory = (node:TabNode) => {
-        var cname = node.getComponent() as EditorType;
+        const cname = node.getComponent() as EditorType;
         const qc = queryEngine.current;
         if(qc === null) { return <></>; }
         switch(cname) {
-            case "editorv": return <CodeEditor queryEngine={qc} serverConfigs={props.serverConfigs} />;
+            case "editorv": return <CodeEditor queryEngine={qc} {...props} />;
             case "chartv": return  <QueryToPropsComponent queryEngine={qc} children={ChartView} />;
             case "jsonv": return  <QueryToPropsComponent queryEngine={qc} children={JsonView} />;
             case "tablev": return  <QueryToPropsComponent queryEngine={qc} children={TblView} />;
             case "consolev": return  <QueryToPropsComponent queryEngine={qc} children={ConsoleView} />;
-            case "treev": return  <ServerTree queryEngine={qc}  serverConfigs={props.serverConfigs} />;
+            case "treev": return  <ServerTree queryEngine={qc}  {...props} />;
         }
     }
 
@@ -268,7 +333,7 @@ function IdeFlexPanel(props:{serverConfigs:ServerConfig[]}) {
     }
 
     const iconFactory = (node: TabNode) => {
-        let cname = node.getComponent() as EditorType;
+        const cname = node.getComponent() as EditorType;
         let ic:IconName = "annotation";
         switch(cname) {
             case "editorv": ic = "annotation"; break;
@@ -301,8 +366,12 @@ class QueryToPropsComponent extends Component<{queryEngine:QueryEngine, children
 
     queryListener =  new class extends QueryEngineAdapter {
         constructor(private parent: QueryToPropsComponent) { super(); }
-        tabChanged(queryable: Queryable, qTab: SmartRs): void { this.parent.setState({srs:qTab, exception:null, queryable });  }
-        queryError(queryable: Queryable, exception: string): void { this.parent.setState({srs:null, exception, queryable });  }
+        tabChanged(queryable: Queryable, qTab: SmartRs, exceededMaxRows:boolean): void { 
+            this.parent.setState({srs:qTab, exception:null, queryable });  
+        }
+        queryError(queryable: Queryable, exception: string): void { 
+            this.parent.setState({srs:null, exception, queryable });  
+        }
     }(this);
 
     componentDidMount()    {  this.props.queryEngine.addListener(this.queryListener);   }
@@ -322,38 +391,41 @@ function JsonView(props:SqlResult) {
 function ConsoleView(props:SqlResult) {
     const [txt,setTxt] = useState("q)");
     useEffect(() => {
-        let t = "";
-        if(props.srs && props.srs.rsdata) {
-            const rsdata = props.srs.rsdata;
-            if(rsdata.exception && rsdata.exception.length>0) {
-                t = "q)" + props.queryable?.query + "\r\n" + rsdata.exception + "\r\n" + txt;
-            } else if(props.exception !== null && props.exception.length>0) {
-                t = "q)" + props.queryable?.query + "\r\n" + props.exception + "\r\n" + txt;
-            } else if(props.srs && rsdata.console) {
-                t = "q)" + props.queryable?.query + "\r\n" + rsdata.console  + txt;
-            }  
+        if(props && props.queryable?.query) {
+            let t = "q)" + props.queryable?.query + "\r\n";
+            if(props.srs && props.srs.rsdata) {
+                const rsdata = props.srs.rsdata;
+                if(rsdata.exception && rsdata.exception.length>0) {
+                    t = t + rsdata.exception + "\r\n";
+                } else if(props.exception !== null && props.exception.length>0) {
+                    t = t + props.exception + "\r\n";
+                } else if(rsdata.console) {
+                    t = t + rsdata.console;
+                }  
+            }
+            t = t + txt;
+            setTxt(t.length > 5000 ? t.substring(0,10000) : t);
         }
-        setTxt(t.length > 5000 ? t.substring(0,10000) : t);
     // If you add txt it just keeps calling recursively
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    },[props])
+    },[props]);
     return <textarea style={{width:"100%", height:"98%"}} rows={200} value={txt} readOnly />;
 }
 
 function ChartView(props:SqlResult) {
-    let context = useContext(ThemeContext);
+    const context = useContext(ThemeContext);
     const [chartType, setChartType] = useState<ChartType>("timeseries"); // setChartType
 
     useEffect(() => {
-        let sp = new URLSearchParams(window.location.search);
-        let ct = sp.get("chart");
+        const sp = new URLSearchParams(window.location.search);
+        const ct = sp.get("chart");
         if(ct != null && ct.length>0) {
             setChartType(ct as ChartType);
         }
     },[]);
 
     const handleChartTypeChange = (chartType:ChartType) => {
-        let newUrl = addParameter(window.location.href,"chart",chartType);
+        const newUrl = addParameter(window.location.href,"chart",chartType);
 		window.history.replaceState({}, '', newUrl);
         setChartType(chartType);
     }
@@ -375,11 +447,11 @@ function TblView(props:SqlResult):JSX.Element {
     if(props.exception !== null && props.exception.length>0) { return <ErrDisplay exception={props.exception} />;  }
     if(props.srs && props.srs.rsdata !== undefined) {
         const rsdata = props.srs.rsdata;
-        if(rsdata.tbl !== undefined) {
-            let e = MyUpdatingChart.getChart("grid",props.srs, context.theme);
-            if(e !== null) { return e; }
-        } else if(rsdata.k !== undefined) {
+        if(rsdata.tbl === undefined || (rsdata.tbl.data.length === 0 && rsdata.k !== undefined)) {
             return <KView k={rsdata.k} />;
+        } else if(rsdata.tbl !== undefined) {
+            const e = MyUpdatingChart.getChart("grid",props.srs, context.theme);
+            if(e !== null) { return e; }
         } else  if(rsdata.exception && rsdata.exception.length>0) { 
             return <ErrDisplay exception={rsdata.exception} />;  
         }
@@ -393,7 +465,7 @@ function KView(props:{k:any}) {
         k === null ? "::"
             : Array.isArray(k) ? 
                 ((k as any[]).length === 0) ? "()" : 
-                (k as any[]).every(it => typeof it === typeof k[0] && !Array.isArray(k[0])) ? (k[0] === "string" ? "`" : "") + (k as any[]).join(typeof k[0] === "string" ? "`" : " ") : 
+                (k as any[]).every(it => typeof it === typeof k[0] && !Array.isArray(k[0])) ? (typeof k[0] === "string" ? "`" : "") + (k as any[]).join(typeof k[0] === "string" ? "`" : " ") : 
                     <ul>{(k as any[]).map(e => <li><KView k={e} /></li>)}</ul>
             : typeof k === "object" ? "object"
             : ""+k

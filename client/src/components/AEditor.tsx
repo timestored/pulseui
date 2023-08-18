@@ -1,3 +1,29 @@
+/*******************************************************************************
+ *
+ *   $$$$$$$\            $$\                     
+ *   $$  __$$\           $$ |                     
+ *   $$ |  $$ |$$\   $$\ $$ | $$$$$$$\  $$$$$$\   
+ *   $$$$$$$  |$$ |  $$ |$$ |$$  _____|$$  __$$\  
+ *   $$  ____/ $$ |  $$ |$$ |\$$$$$$\  $$$$$$$$ |  
+ *   $$ |      $$ |  $$ |$$ | \____$$\ $$   ____|  
+ *   $$ |      \$$$$$$  |$$ |$$$$$$$  |\$$$$$$$\  
+ *   \__|       \______/ \__|\_______/  \_______|
+ *
+ *  Copyright c 2022-2023 TimeStored
+ *
+ *  Licensed under the Reciprocal Public License RPL-1.5
+ *  You may obtain a copy of the License at
+ *
+ *  https://opensource.org/license/rpl-1-5/
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ ******************************************************************************/
+ 
 import { Button, ButtonGroup } from '@blueprintjs/core';
 import React from 'react';
 import { Component } from 'react';
@@ -14,11 +40,11 @@ export default class AEditor extends Component<AEditorState & WidgetProperties<A
 
     constructor(props:any) {
         super(props);
-        let key = this.props.savedState?.key ?? this.props.key;
-        let defaultCode = this.props.savedState?.code ?? this.props.code;
-        let format = this.props.savedState?.format ?? this.props.format;
+        const key = this.props.savedState?.key ?? this.props.key;
+        const defaultCode = this.props.savedState?.code ?? this.props.code;
+        const format = this.props.savedState?.format ?? this.props.format;
         let code = defaultCode;
-        let arg = this.props.queryEngine.argMap[key];
+        const arg = this.props.queryEngine.argMap[key];
         if(arg && arg.length>0) {
             code = arg[0];
         } else {

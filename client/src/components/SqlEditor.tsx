@@ -1,3 +1,29 @@
+/*******************************************************************************
+ *
+ *   $$$$$$$\            $$\                     
+ *   $$  __$$\           $$ |                     
+ *   $$ |  $$ |$$\   $$\ $$ | $$$$$$$\  $$$$$$\   
+ *   $$$$$$$  |$$ |  $$ |$$ |$$  _____|$$  __$$\  
+ *   $$  ____/ $$ |  $$ |$$ |\$$$$$$\  $$$$$$$$ |  
+ *   $$ |      $$ |  $$ |$$ | \____$$\ $$   ____|  
+ *   $$ |      \$$$$$$  |$$ |$$$$$$$  |\$$$$$$$\  
+ *   \__|       \______/ \__|\_______/  \_______|
+ *
+ *  Copyright c 2022-2023 TimeStored
+ *
+ *  Licensed under the Reciprocal Public License RPL-1.5
+ *  You may obtain a copy of the License at
+ *
+ *  https://opensource.org/license/rpl-1-5/
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ ******************************************************************************/
+ 
 import { useContext, useEffect, useRef } from 'react';
 import {keymap, highlightSpecialChars, drawSelection, highlightActiveLine, dropCursor,
     rectangularSelection, crosshairCursor, EditorView, KeyBinding,
@@ -49,9 +75,9 @@ export const MyEditor = (props:Partial<EditorProps> & {lang:LanguageSupport} ) =
 	onChangeRef.current = props.onChange ?? ((s:string)=>{});
 
 	useEffect(() => {
-		let myKeyMap:KeyBinding[] = [{key:"Ctrl-s",   run:() => { runSelectionRef.current("s"); return true; }, preventDefault:true },
-								 {key:"Ctrl-e",  preventDefault:true,
-								 	run:(v: EditorView) => { 
+		const myKeyMap:KeyBinding[] = [{key:"Ctrl-s",   run:() => { runSelectionRef.current("s"); return true; }, preventDefault:true },
+								{key:"Ctrl-e",  preventDefault:true,
+									run:(v: EditorView) => { 
 											const m = v.state.selection.main;
 											const txt = m['from']<m['to'] ? v.state.doc.sliceString(m['from'],m['to']) : v.state.doc.sliceString(0);
 											runSelectionRef.current(txt); 
@@ -60,10 +86,10 @@ export const MyEditor = (props:Partial<EditorProps> & {lang:LanguageSupport} ) =
 								{key:"Ctrl-Enter",run:(v: EditorView) => { runLineRef.current(v.state.doc.lineAt(v.state.selection.main.head).text); return true; }, preventDefault:true, mac:"Cmd-Enter", win:"Ctrl-Enter" }];
 									
 		
-		let updateListenerExtension = EditorView.updateListener.of((update) => {
+								const updateListenerExtension = EditorView.updateListener.of((update) => {
 			if (update.docChanged) { onChangeRef && onChangeRef.current(view.state.doc.toString()); } 
 		});
-		let extensions = [props.lang,
+		const extensions = [props.lang,
 						keymap.of(myKeyMap),
 						updateListenerExtension,
 						basicSetup];
@@ -72,7 +98,7 @@ export const MyEditor = (props:Partial<EditorProps> & {lang:LanguageSupport} ) =
 			extensions.push(sublime); // abcdef   sublime    oneDarkTheme
 		}
 		const state = EditorState.create({ doc: value, extensions });
-	  	const view = new EditorView({ state, parent: editor.current ?? undefined });
+		const view = new EditorView({ state, parent: editor.current ?? undefined });
 		return () => { view.destroy(); };
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [context.theme]);
@@ -134,7 +160,7 @@ const basicSetup: Extension = [
 	syntaxHighlighting(defaultHighlightStyle, {fallback: true}),
 	bracketMatching(),
 	// closeBrackets(), - Don't turn on as this adds two ``, when clicked once.
-	autocompletion(),
+	autocompletion({activateOnTyping:true, tooltipClass:(es) => "autocompletecls"}),
 	rectangularSelection(),
 	crosshairCursor(),
 	highlightActiveLine(),
@@ -156,7 +182,7 @@ const SQLTypes = "array binary bit boolean char character clob date decimal doub
 const SQLKeywords = "absolute action add after all allocate alter and any are as asc assertion at authorization before begin between both breadth by call cascade cascaded case cast catalog check close collate collation column commit condition connect connection constraint constraints constructor continue corresponding count create cross cube current current_date current_default_transform_group current_transform_group_for_type current_path current_role current_time current_timestamp current_user cursor cycle data day deallocate declare default deferrable deferred delete depth deref desc describe descriptor deterministic diagnostics disconnect distinct do domain drop dynamic each else elseif end end-exec equals escape except exception exec execute exists exit external fetch first for foreign found from free full function general get global go goto grant group grouping handle having hold hour identity if immediate in indicator initially inner inout input insert intersect into is isolation join key language last lateral leading leave left level like limit local localtime localtimestamp locator loop map match method minute modifies module month names natural nesting new next no none not of old on only open option or order ordinality out outer output overlaps pad parameter partial path prepare preserve primary prior privileges procedure public read reads recursive redo ref references referencing relative release repeat resignal restrict result return returns revoke right role rollback rollup routine row rows savepoint schema scroll search second section select session session_user set sets signal similar size some space specific specifictype sql sqlexception sqlstate sqlwarning start state static system_user table temporary then timezone_hour timezone_minute to trailing transaction translation treat trigger under undo union unique unnest until update usage user using value values view when whenever where while with without work write year zone "
 
 // Taken from qStudio - syntaxpane
-const qKeyWords = "xlog xdesc wj1 while sums rsave read1 read0 prior prev prds next mmin mins md5 mavg lsq load if hopen hclose get first exit exec do dev deltas cut cov cor binr attr and avg asc all bin cross count differ each eval except exp fby fills fkeys flip getenv group gtime hcount hsym iasc idesc in inter insert inv key keys ltime max maxs mcount mdev med meta mmax mmu mod msum neg not null or over parse peach prd rand rank ratios raze reciprocal reverse rload rotate save scan set setenv show signum ss ssr like string sublist sv system tables til type ungroup union upsert value var view views vs where within wj wsum xasc xbar xcol xcols xexp xgroup xkey xprev xrank 0: 1: 2: 1 2 lj pj ij ej uj aj select update delete lower upper trim rtrim ltrim cols sin asin cos acos tan atan log sqrt abs min sum last wavg hdel enlist ceiling floor any";
+const qKeyWords = "xlog xdesc wj1 while sums rsave read1 read0 prior prev prds next mmin mins md5 mavg lsq load if hopen hclose get first exit exec do dev deltas cut cov cor binr attr and avg asc all bin cross count differ each eval except exp fby fills fkeys flip getenv group gtime hcount hsym iasc idesc in inter insert inv key keys ltime max maxs mcount mdev med meta mmax mmu mod msum neg not null or over parse peach prd rand rank ratios raze reciprocal reverse rload rotate save scan set setenv show signum ss ssr like string sublist sv system tables til type ungroup union upsert value var view views vs where within wj wsum xasc xbar xcol xcols xexp xgroup xkey xprev xrank lj pj ij ej uj aj select update delete lower upper trim rtrim ltrim cols sin asin cos acos tan atan log sqrt abs min sum last wavg hdel enlist ceiling floor any";
 const Qns = ".Q.addmonths .Q.addr .Q.host .Q.chk .Q.cn .Q.pn .Q.D .Q.dd .Q.dpft .Q.dsftg .Q.en .Q.fc .Q.fk .Q.fmt .Q.fs .Q.ft .Q.gc .Q.hdpf .Q.ind .Q.P .Q.par .Q.PD .Q.pd .Q.pf .Q.PV .Q.pv .Q.qp .Q.qt .Q.s .Q.ty .Q.u .Q.v .Q.V .Q.view .Q.def .Q.ff .Q.fsn .Q.fu .Q.id .Q.j10 .Q.x10 .Q.j12 .Q.x12 .Q.k .Q.MAP .Q.opt .Q.w .Q.pt .Q.bv .Q.vp .Q.U";
 const Zns = ".z.c .z.exit .z.pd .z.q .z.W .z.zd .z.ws .z.bm .z.a .z.ac .z.b .z.d .z.D .z.f .z.h .z.i .z.k .z.K .z.l .z.o .z.pc .z.pg .z.ph .z.pi .z.po .z.pp .z.ps .z.pw .z.1 .z.s .z.t .z.T .z.ts .z.u .z.vs .z.w .z.x .z.z .z.Z .z.n .z.N .z.p .z.P";
 

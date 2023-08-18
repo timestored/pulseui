@@ -1,3 +1,29 @@
+/*******************************************************************************
+ *
+ *   $$$$$$$\            $$\                     
+ *   $$  __$$\           $$ |                     
+ *   $$ |  $$ |$$\   $$\ $$ | $$$$$$$\  $$$$$$\   
+ *   $$$$$$$  |$$ |  $$ |$$ |$$  _____|$$  __$$\  
+ *   $$  ____/ $$ |  $$ |$$ |\$$$$$$\  $$$$$$$$ |  
+ *   $$ |      $$ |  $$ |$$ | \____$$\ $$   ____|  
+ *   $$ |      \$$$$$$  |$$ |$$$$$$$  |\$$$$$$$\  
+ *   \__|       \______/ \__|\_______/  \_______|
+ *
+ *  Copyright c 2022-2023 TimeStored
+ *
+ *  Licensed under the Reciprocal Public License RPL-1.5
+ *  You may obtain a copy of the License at
+ *
+ *  https://opensource.org/license/rpl-1-5/
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ ******************************************************************************/
+ 
 import { Queryable } from "../engine/queryEngine";
 
 
@@ -12,7 +38,7 @@ export default class desktopModel {
     }
 
     addWorkspace(title:string) {
-        let w = new workspaceModel(this, title);
+        const w = new workspaceModel(this, title);
         this.workspaces = this.workspaces.concat(w);
         this.listeners.map(l => l.configChanged());
     }
@@ -24,7 +50,7 @@ export default class desktopModel {
         if(index >= this.workspaces.length || index < 0) {
             throw new Error("workspace outside range");
         }
-        let ws = this.workspaces.slice();
+        const ws = this.workspaces.slice();
         ws[index].title = title;
         this.workspaces = ws;
     }
@@ -39,12 +65,12 @@ export default class desktopModel {
         if(index >= this.workspaces.length) {
             throw new Error("workspace outside range");
         }
-        let deletedW = this.workspaces[index];
+        const deletedW = this.workspaces[index];
         // change selection before removing active workspace
         if(deletedW === this.selectedWorkspace) {
             this.selectedWorkspace = this.workspaces[index === 0 ? 1 : index - 1];
         }
-        this.workspaces = this.workspaces.filter((e,i) => i !== index);;
+        this.workspaces = this.workspaces.filter((e,i) => i !== index);
     }
 
     public getWorkspaces():workspaceModel[] { return this._workspaces; }
@@ -61,7 +87,7 @@ export default class desktopModel {
     }
 
     public set selectedWorkspace(workspace) { 
-        let p = this.workspaces.indexOf(workspace)
+        const p = this.workspaces.indexOf(workspace)
         if (p === undefined) {
             throw new Error('desktop must contain workspace');
         }
@@ -83,7 +109,7 @@ interface desktopListener {
 export class workspaceModel {
 	private listeners:Array<workspaceListener> = [];
     widgets:widget<any>[] = [];
-    title:string = "sheet1";
+    title = "sheet1";
 
     constructor(readonly desktop:desktopModel, title:string){
         this.title = title;

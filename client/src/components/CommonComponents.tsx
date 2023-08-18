@@ -1,3 +1,29 @@
+/*******************************************************************************
+ *
+ *   $$$$$$$\            $$\                     
+ *   $$  __$$\           $$ |                     
+ *   $$ |  $$ |$$\   $$\ $$ | $$$$$$$\  $$$$$$\   
+ *   $$$$$$$  |$$ |  $$ |$$ |$$  _____|$$  __$$\  
+ *   $$  ____/ $$ |  $$ |$$ |\$$$$$$\  $$$$$$$$ |  
+ *   $$ |      $$ |  $$ |$$ | \____$$\ $$   ____|  
+ *   $$ |      \$$$$$$  |$$ |$$$$$$$  |\$$$$$$$\  
+ *   \__|       \______/ \__|\_______/  \_______|
+ *
+ *  Copyright c 2022-2023 TimeStored
+ *
+ *  Licensed under the Reciprocal Public License RPL-1.5
+ *  You may obtain a copy of the License at
+ *
+ *  https://opensource.org/license/rpl-1-5/
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ ******************************************************************************/
+ 
 import { Button, Card, Classes, Elevation, FormGroup, H3, Icon, InputGroup, Intent, Menu, MenuItem, NonIdealState, Overlay } from "@blueprintjs/core";
 import { Alignment, Navbar, NavbarGroup, NavbarHeading } from '@blueprintjs/core';
 import React, { Component, FunctionComponent, ReactNode, SyntheticEvent, useCallback, useContext, useEffect, useRef, useState } from "react";
@@ -30,7 +56,7 @@ export const MyNavBar: FunctionComponent<{ rightChildren?: React.ReactNode, chil
         <NavbarGroup align={Alignment.LEFT} className="leftNavbarGroup">
           <Link to="/dash"><NavbarHeading><Logo /></NavbarHeading></Link>
           <Link to="/dash"><Button icon="dashboard" text="Dashboards" minimal={true} intent={isSel("dashboard")} title="Dashboards" /></Link>
-          <Link to="/sqleditor"><Button icon="database" minimal={true} text="SQL Editor" intent={isSel("sqleditor")} title="SQL Editor" /></Link>
+          <Link to="/sqleditor"><Button icon="database" minimal={true} text="SQL" intent={isSel("sqleditor")} title="SQL Editor" /></Link>
           {isAdmin(context) && <Link to="/connections"><Button icon="globe-network" minimal={true} text="Connections" intent={isSel("connections")} title="Connections" /></Link>}
           
           {children}
@@ -87,10 +113,11 @@ function UserButton(props:{username:string | undefined, isAdmin:boolean}) {
 }
 
 
-  export function MyOverlay(props: { isOpen: boolean, handleClose: () => void, title: string, children?: React.ReactNode }) {
+  export function MyOverlay(props: { isOpen: boolean, handleClose: () => void, title?: string, children?: React.ReactNode, width?:number }) {
+    const w = props.width ?? 600;
     return  <Overlay isOpen={props.isOpen} className={Classes.OVERLAY_SCROLL_CONTAINER} onClose={props.handleClose}>
-        <Card elevation={Elevation.FOUR} style={{width:"600px",left:"calc(50vw - 300px)", top:"100px"}} >
-            <H3>{props.title}</H3>
+        <Card elevation={Elevation.FOUR} style={{width:w+"px",left:"calc(50vw - " + (w/2) + "px)", top:"100px"}} >
+            {props.title && <H3>{props.title}</H3>}
              {props.children}
          </Card>
          </Overlay>
@@ -124,25 +151,25 @@ class Modal extends Component<{ children: React.ReactNode }> {
 }
 
 
-export function addParameter(url:string, parameterName:string, parameterValue:string, atStart:boolean = false):string {
-  let replaceDuplicates = true;
-let urlhash = '';
-let cl = url.length;
+export function addParameter(url:string, parameterName:string, parameterValue:string):string {
+  let urlhash = '';
+  let cl = url.length;
   if(url.indexOf('#') > 0) {
       cl = url.indexOf('#');
       urlhash = url.substring(url.indexOf('#'),url.length);
   }
-  let sourceUrl = url.substring(0,cl);
+  const sourceUrl = url.substring(0,cl);
 
-  var urlParts = sourceUrl.split("?");
-  var newQueryString = "";
+  const urlParts = sourceUrl.split("?");
+  let newQueryString = "";
 
+  const pNam = parameterName ? encodeURIComponent(parameterName) : '';
   if (urlParts.length > 1) {
-      var parameters = urlParts[1].split("&");
-      for (var i=0; (i < parameters.length); i++) {
-          var parameterParts = parameters[i].split("=");
-          if (!(replaceDuplicates && parameterParts[0] === parameterName)) {
-      newQueryString = newQueryString === "" ? "?" : newQueryString+"&";
+    const parameters = urlParts[1].split("&");
+      for (let i=0; (i < parameters.length); i++) {
+          const parameterParts = parameters[i].split("=");
+          if (!(parameterParts[0] === pNam)) {
+              newQueryString = newQueryString === "" ? "?" : newQueryString+"&";
               newQueryString += parameterParts[0] + "=" + (parameterParts[1]?parameterParts[1]:'');
           }
       }
@@ -150,15 +177,12 @@ let cl = url.length;
   if (newQueryString === "")
       newQueryString = "?";
 
-  if(atStart){
-      newQueryString = '?'+ parameterName + "=" + parameterValue + (newQueryString.length>1?'&'+newQueryString.substring(1):'');
-  } else {
-      if (newQueryString !== "" && newQueryString !== '?')
-          newQueryString += "&";
-      newQueryString += parameterName + "=" + (parameterValue?encodeURIComponent(parameterValue):'');
-  }
+  const pVal = (parameterValue ? encodeURIComponent(parameterValue) : '');
+  if (newQueryString !== "" && newQueryString !== '?')
+      newQueryString += "&";
+  newQueryString += pNam + "=" + pVal;
   return urlParts[0] + newQueryString + urlhash;
-};
+}
 
 
 MyModal.defaultProps = {
@@ -207,7 +231,7 @@ export function HelpLink(props: { htmlTxt: string, href: string }) {
 
 
 type MyInputTypes = {
-  name: string, label: string, value: string | undefined, placeholder?: string,
+  name: string, label: string, value: string | undefined, placeholder?: string, disabled?: boolean, size?: number,
   onChange?: (e: React.FormEvent<HTMLInputElement>) => void, type?: string
 };
 /** Displays an input text box , triggers on every change and can be directly mapped to states with the same name. */
@@ -216,7 +240,7 @@ export function MyInput(props: MyInputTypes) {
   const { name, label, value, placeholder, onChange, type } = props;
   return <FormGroup label={label} labelFor={id} inline>
     <InputGroup id={id} name={name} value={value ? value : ""} placeholder={placeholder}
-      onChange={onChange} type={type} />
+      onChange={onChange} type={type} disabled={props.disabled} size={props.size} />
   </FormGroup>;
 }
 

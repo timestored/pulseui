@@ -1,3 +1,29 @@
+/*******************************************************************************
+ *
+ *   $$$$$$$\            $$\                     
+ *   $$  __$$\           $$ |                     
+ *   $$ |  $$ |$$\   $$\ $$ | $$$$$$$\  $$$$$$\   
+ *   $$$$$$$  |$$ |  $$ |$$ |$$  _____|$$  __$$\  
+ *   $$  ____/ $$ |  $$ |$$ |\$$$$$$\  $$$$$$$$ |  
+ *   $$ |      $$ |  $$ |$$ | \____$$\ $$   ____|  
+ *   $$ |      \$$$$$$  |$$ |$$$$$$$  |\$$$$$$$\  
+ *   \__|       \______/ \__|\_______/  \_______|
+ *
+ *  Copyright c 2022-2023 TimeStored
+ *
+ *  Licensed under the Reciprocal Public License RPL-1.5
+ *  You may obtain a copy of the License at
+ *
+ *  https://opensource.org/license/rpl-1-5/
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ ******************************************************************************/
+ 
 import React, { Component, MouseEventHandler, Suspense, useEffect, useState } from 'react';
 import QueryEngine, { getSensibleServer, Queryable, SetArgsType, UpdatingQueryable, UpdatingQueryableListener } from '../engine/queryEngine';
 import { MyHelpLink, MyModal, getDefaultErrorFallback } from './CommonComponents';
@@ -6,8 +32,7 @@ import ReactECharts from '../echarts-for-react';
 import { Button, IconName, MenuItem, NonIdealState } from '@blueprintjs/core';
 import { ServerConfig } from './ConnectionsPage';
 import { TabNode } from 'flexlayout-react';
-import { ChartWrapper } from '../styledComponents';
-import { ExampleTestCases } from '../engine/ViewStrategy';
+import { ChartWrapper,ChartWrapper90 } from '../styledComponents';
 import { DataZoomComponentOption, EChartsOption, graphic, PieSeriesOption, SeriesOption, TitleComponentOption } from 'echarts';
 import { Link } from 'react-router-dom';
 import 'jsonic';
@@ -27,6 +52,8 @@ import { ErrorBoundary } from '../ErrorBoundary';
 import { SubConfigEditor } from './SubConfigEditor';
 import { GridConfig } from './AGrid';
 import { ActionHandler,runActions } from '../engine/actionHandlers';
+import ABreadcrumb from '../pro/ABreadcrumb';
+import { getChartHelpFor, getH2DemoQueryable, getKdbDemoQueryable } from '../pro/ChartHelp';
 const ESurface = React.lazy(() => import('./3DChartFactory'));
 const AGrid = React.lazy(() => import('./AGrid'));
 
@@ -68,7 +95,7 @@ function getThm(context:IThemeType) { return context.theme === 'dark' ? 'custome
 export function getThmT(theme:ThemeType) { return theme === 'dark' ? 'customed' : ""; }
 
 export function getTooltipDefaults(theme: ThemeType) { 
-    let backgroundColor = theme === 'dark' ? 'rgba(11,11,11,0.75);' : "rgba(210,210,210,0.75);";
+    const backgroundColor = theme === 'dark' ? 'rgba(11,11,11,0.75);' : "rgba(210,210,210,0.75);";
     return {
         backgroundColor,
         borderWidth:0,
@@ -88,10 +115,10 @@ interface MyChartProps {
     chartType: ChartType,
     selected: boolean,
     clearSelected: () => void,
-    tabNode: TabNode,
+    tabNode: TabNode|undefined,
     queryEngine: QueryEngine,
     serverConfigs: ServerConfig[]
-};
+}
 interface MyUpdatingChartState {
     chartType: ChartType,
     config: any,
@@ -127,8 +154,9 @@ export type InteractiveConfig = {enabled?:boolean, wkeyName?:string};
 
 // NUMBER3P - P = Plain - i.e. without commas
 export type ColFormat = ""|"NUMBER0" |"NUMBER1" |"NUMBER2" |"NUMBER3" |"NUMBER4" |"NUMBER5" |"NUMBER6" |"NUMBER7" |"NUMBER8" |"NUMBER9"
-                          |"NUMBER0P"|"NUMBER1P"|"NUMBER2P"|"NUMBER3P"|"NUMBER4P"|"NUMBER5P"|"NUMBER6P"|"NUMBER7P"|"NUMBER8P"|"NUMBER9P" // P = Plain i.e. no commas
-    |"PERCENT0"|"PERCENT1"|"PERCENT2"|"CURUSD"|"CUREUR"|"CURGBP"|"TAG"|"HTML"|"SPARKLINE"|"SPARKBAR"|"SPARKDISCRETE"|"SPARKBULLET"|"SPARKPIE"|"SPARKBOXPLOT";
+            |"NUMBER0P"|"NUMBER1P"|"NUMBER2P"|"NUMBER3P"|"NUMBER4P"|"NUMBER5P"|"NUMBER6P"|"NUMBER7P"|"NUMBER8P"|"NUMBER9P" // P = Plain i.e. no commas
+            |"DATE"|"DATEDD"|"DATEMM"|"DATEMONTH"|"DATEMON"|"TIME"|"TIMEMM"|"TIMESS" // P = Plain i.e. no commas
+    |"PERCENT0"|"PERCENT1"|"PERCENT2"|"CURUSD"|"CUREUR"|"CURGBP"|"CURUSD0"|"CUREUR0"|"CURGBP0"|"TAG"|"HTML"|"SPARKLINE"|"SPARKBAR"|"SPARKDISCRETE"|"SPARKBULLET"|"SPARKPIE"|"SPARKBOXPLOT";
 
 export function ChartForm(props:{ onItemSelect:(ct:ChartType)=>void, chartType:ChartType }) {
     const [ lastCT, setLastCT ] = useState<ChartType>(props.chartType === "grid" ? "area" : props.chartType);
@@ -188,24 +216,27 @@ export class MyUpdatingChart extends Component<MyChartProps, MyUpdatingChartStat
 
     constructor(props: MyChartProps) {
         super(props);
-        var config = this.props.tabNode.getConfig();
+        const config = this.props.tabNode === undefined ? {} : this.props.tabNode.getConfig();
 
-        let qb = config?.dashstate?.queryable;
+        let qb = config?.dashstate?.queryable as Queryable;
         if(qb === undefined) {
-            let serverConfig = getSensibleServer(props.serverConfigs);
+            const serverConfig = getSensibleServer(props.serverConfigs);
             qb = getDemoQueryable(serverConfig, props.chartType);
+        } else {
+            // Must let it know this query will be a pivot straight away to limit result set pulled back
+            const isPiv = config.dashstate.subConfig?.gridConfig?.showPulsePivot === true;
+            qb = new Queryable(qb.serverName, qb.query, qb.refreshPeriod, isPiv ? "pivot:||" : "");
         }
-
         this.uQueryable = new UpdatingQueryable(props.serverConfigs, props.queryEngine, this, qb);
         // save state in flexlayout node tree
-        this.props.tabNode.setEventListener("save", (p:any) => {
+        this.props.tabNode && this.props.tabNode.setEventListener("save", (p:any) => {
             config.dashstate = { chartType: this.state.chartType, config: this.state.config, queryable: this.uQueryable.queryable, subConfig: this.state.subConfig, };
         });
         // Then load in the saved overrides
-        let ds = config.dashstate ?? {};
-        let oldFix = Object.keys(ds).includes("chartType") ? { chartType:this.remapOldChartTypes(ds['chartType'])} : {};
+        const ds = config.dashstate ?? {};
+        const oldFix = Object.keys(ds).includes("chartType") ? { chartType:this.remapOldChartTypes(ds['chartType'])} : {};
         // merging subCOnfig in case loading an old subConfig that is missing keys
-        let s = { ...this.state, ...props, ...ds, ...oldFix, subConfig:merge(getEmptySubConfig(),ds.subConfig ?? {}) };
+        const s = { ...this.state, ...props, ...ds, ...oldFix, subConfig:merge(getEmptySubConfig(),ds.subConfig ?? {}) };
         this.state = { ...s, lastNongridChartType:s.chartType === "grid" ? "area" : s.chartType};
     }
 
@@ -221,12 +252,12 @@ export class MyUpdatingChart extends Component<MyChartProps, MyUpdatingChartStat
     render() {
         const { srs, exception, chartType, subConfig } = this.state;
         const setArgsWithType:SetArgsType = (argMapWithTypes: { [argKey: string]: any }) => {
-            let iConfig = this.state.subConfig.interactiveConfig;
+            const iConfig = this.state.subConfig.interactiveConfig;
             if(iConfig.enabled !== false) {
                 let pre = iConfig.wkeyName ?? '';
                 pre = pre.replace(/[^0-9a-zA-Z_]/gi, '').replaceAll(" ","_"); // alphanumeric only
-                let nObj:{ [argKey: string]: any } = {};
-                for (var key in argMapWithTypes) {
+                const nObj:{ [argKey: string]: any } = {};
+                for (const  key in argMapWithTypes) {
                     
                     nObj[(pre.trim().length === 0 ? "" : pre + ".") + key] = argMapWithTypes[key];
                 }
@@ -240,12 +271,18 @@ export class MyUpdatingChart extends Component<MyChartProps, MyUpdatingChartStat
         let Display: JSX.Element | null = <div>Error!</div>;
 
         try {
+            // any of these big things change, redraw the whole chart. Else old column names etc can hang around.
+            const chartKey = this.state.myKey + this.uQueryable.queryable.query + this.uQueryable.queryable.serverCmd;
+
             Display = srs === undefined ? null :
                 exception ?
                     exception.includes("Awaiting Submit.") ? 
                         <NonIdealState icon="confirm" title="Awaiting Submit" description={""} action={<div>There should be a form on this dashboard. <br />Try completing the form and pressing submit.</div>} />
-                        : <NonIdealState icon="error" title="Error Generating Visualization" description={exception} action={<div>Try changing a query setting in the editor</div>} />
-                : MyUpdatingChart.getChart(chartType, srs, this.context.theme, subConfig, setArgsWithType, this.onConfigChange, this.state.myKey, actionRunner);
+                    : exception.includes("Missing Required Arguments") ? 
+                        <NonIdealState icon="confirm" title="Awaiting Required Arguments" description={""} action={<div>This display requires a user parameter.<br />Try selecting a form value or clicking a table row.</div>} />
+                        : <NonIdealState icon="error" title="Error Generating Visualization" description={<>{exception.split("\n").map(s => <p>{s}</p>)}</>} action={<div>Try changing a query setting in the editor</div>} />
+                : MyUpdatingChart.getChart(chartType, srs, this.context.theme, subConfig, setArgsWithType, this.onConfigChange, 
+                    chartKey, actionRunner);
         } catch (error) {
             console.error(error);
         }
@@ -265,20 +302,24 @@ export class MyUpdatingChart extends Component<MyChartProps, MyUpdatingChartStat
         } catch (error) {
             console.error(error);
         }
-        const tabTitle = this.props.tabNode.getName() || (this.props.chartType === "grid" ? "Grid" : "Chart");
-
-        return <ChartWrapper>
+        const tabTitle = (this.props.tabNode && this.props.tabNode.getName()) || (this.props.chartType === "grid" ? "Grid" : "Chart");
+        const content = <>
+            {subConfig.gridConfig.showPulsePivot && srs && <ABreadcrumb key={this.uQueryable.queryable.query} srs={srs} allCols={[]} byorpivotCols={[]} changeEvent={(groupby,pivot,sel)=>{
+                const s = "pivot:" + groupby.join(",") + "|" + pivot.join(",") + "|" + sel;
+                this.uQueryable.setServerCmd(s);
+                }}  />}
             <ErrorBoundary  resetKeys={[chartType]} FallbackComponent={getDefaultErrorFallback("Error displaying this chart. Try changing chart type.")} >{Display}</ErrorBoundary>
             {this.props.selected && <MyModal title={tabTitle} isOpen={true} handleClose={this.props.clearSelected}>
                     <ErrorBoundary  resetKeys={[chartType]} FallbackComponent={getDefaultErrorFallback("Error displaying editor. Raw json may be corrupt.")} >
                     {Editor}
                 </ErrorBoundary>
-                </MyModal>}
-        </ChartWrapper>;
+                </MyModal>}</>;
+
+        return subConfig.gridConfig.showPulsePivot ? <ChartWrapper90>{content}</ChartWrapper90> : <ChartWrapper>{content}</ChartWrapper>;
     }
 
     public static getChart(ct: ChartType, srs: SmartRs, theme: ThemeType = "light", subConfig?:SubConfig, 
-        setArgTyped:SetArgsType=()=>{} , onConfigChange:(s:SubConfig)=>void = ()=>{}, myKey?:number, actionRunner:ActionRunner=()=>{}): JSX.Element | null {
+        setArgTyped:SetArgsType=()=>{} , onConfigChange:(s:SubConfig)=>void = ()=>{}, myKey?:string, actionRunner:ActionRunner=()=>{}): JSX.Element | null {
         if(ct === undefined) {
             return null;
         }
@@ -348,12 +389,12 @@ class EPie extends Component<EChartProps> {
     
     render() {
         const { srs, theme } = this.props;
-        let s = needs({srs:this.props.srs, needsNumbers:1});
+        const s = needs({srs:this.props.srs, needsNumbers:1});
         if(s !== null) { 
             return <ChartHelp chartType="pie" reason={s} /> 
         }
         try {
-            let myOptions:EChartsOption = carefulOverride(toPieOption(srs, theme), this.props.subConfig);
+            const myOptions:EChartsOption = carefulOverride(toPieOption(srs, theme), this.props.subConfig);
             return <>{srs.count() > 200 ? 
                         <NonIdealState icon="error" title="Too Many Rows" >
                             Pie Chart with &gt; 200 segments makes little sense.
@@ -409,13 +450,13 @@ function toPieOption(srs: SmartRs, theme: ThemeType): EChartsOption {
 
 
 function toHeatmapOption(srs: SmartRs): EChartsOption {
-    let nc = srs.chartRS.numericColumns;
+    const nc = srs.chartRS.numericColumns;
     const MIN = Math.min(0, ...nc.map(n => Math.min(...n.vals)));
     const MAX = Math.max(1, ...nc.map(n => Math.max(...n.vals)));
     // Create [[column,row,val],[column,row,val]...]
-    let d: number[][] = [];
+    const d: number[][] = [];
     for (let c = 0; c < nc.length; c++) {
-        let va = nc[c].vals;
+        const va = nc[c].vals;
         for (let r = 0; r < va.length; r++) {
             d.push([c, r, va[r]]);
         }
@@ -436,13 +477,13 @@ function toHeatmapOption(srs: SmartRs): EChartsOption {
 class EHeatMap extends Component<EChartProps> {
     render() {
         const { srs, theme } = this.props;
-        let s = needs({srs:this.props.srs, needsNumbers:1});
+        const s = needs({srs:this.props.srs, needsNumbers:1});
         if(s !== null) { 
             return <ChartHelp chartType="heatmap" reason={s} /> 
         }
 
         try {
-            let myOptions:EChartsOption = carefulOverride(toHeatmapOption(srs), this.props.subConfig);
+            const myOptions:EChartsOption = carefulOverride(toHeatmapOption(srs), this.props.subConfig);
             return <>{srs.count() > 800 ? 
                 <NonIdealState icon="error" title="Too Many Rows" >
                     Heat Map with &gt; 800 rows is not reasonably displayable.
@@ -495,7 +536,7 @@ class EMetrics extends Component<EChartProps> {
     
     render() {
         const { srs } = this.props;
-        let s = needs({srs:this.props.srs, needsNumbers:1});
+        const s = needs({srs:this.props.srs, needsNumbers:1});
         if(s !== null) { 
             return <ChartHelp chartType="metrics" reason={s} /> 
         }
@@ -566,7 +607,7 @@ class ETreeMap extends Component<EChartProps> {
     render() {
         const chartRS = this.props.srs.chartRS;
 
-        let s = needs({srs:this.props.srs, needsNumbers:1, needsStringy:true});
+        const s = needs({srs:this.props.srs, needsNumbers:1, needsStringy:true});
         if(s !== null) { 
             return <ChartHelp chartType="treemap" reason={s} /> 
         }
@@ -590,15 +631,15 @@ class ETreeMap extends Component<EChartProps> {
 
         // Group the leftMost string column, use those indices to "groupBy", then remove that stringCOl and dive to next level recursively
         function getChildren(names: string[][], nums: number[]) {
-            let nameToIndices = groupIndices(names[0]);
-            let s = Array.from(nameToIndices.keys()).map(n => {
-                let indices = nameToIndices.get(n)!;
-                let sum = nums.filter((v, idx) => indices.indexOf(idx) >= 0).reduce((a, b) => a + b, 0);
-                let d: { name: string, value: number | number[], children?: any } = { name: n, value: [sum, Math.sqrt(sum)] };
+            const nameToIndices = groupIndices(names[0]);
+            const s = Array.from(nameToIndices.keys()).map(n => {
+                const indices = nameToIndices.get(n)!;
+                const sum = nums.filter((v, idx) => indices.indexOf(idx) >= 0).reduce((a, b) => a + b, 0);
+                const d: { name: string, value: number | number[], children?: any } = { name: n, value: [sum, Math.sqrt(sum)] };
                 if (names.length > 1) {
-                    let selectedIndices = function (s: any, sIdx: number) { return indices.indexOf(sIdx) >= 0; };
-                    let newNames = names.slice(1).map(stAr => stAr.filter(selectedIndices));
-                    let newNums = nums.filter(selectedIndices);
+                    const selectedIndices = function (s: any, sIdx: number) { return indices.indexOf(sIdx) >= 0; };
+                    const newNames = names.slice(1).map(stAr => stAr.filter(selectedIndices));
+                    const newNums = nums.filter(selectedIndices);
                     d.children = getChildren(newNames, newNums);
                 }
                 return d;
@@ -620,7 +661,7 @@ class ETreeMap extends Component<EChartProps> {
                     ],
                 }],
             };
-            let myOptions:EChartsOption = carefulOverride(options, this.props.subConfig);
+            const myOptions:EChartsOption = carefulOverride(options, this.props.subConfig);
             return <ReactECharts option={myOptions} theme={getThm(this.context)} replaceMerge={REP} />;
         } catch {
             return <ChartHelp chartType="treemap"  />
@@ -638,7 +679,7 @@ class EChart extends Component<EChartProps & { chartType:ChartType }> {
 
     render() {
         const { srs, chartType } = this.props;
-        let s = needs({srs:this.props.srs, needsNumbers:1});
+        const s = needs({srs:this.props.srs, needsNumbers:1});
         if(s !== null) { 
             return <ChartHelp chartType={chartType} reason={s} /> 
         }
@@ -666,7 +707,7 @@ class EChart extends Component<EChartProps & { chartType:ChartType }> {
                 // Horizontal needs slightly more space in case top bar is full width and onto legend.
                 grid:(chartType === "bar_horizontal" || chartType === "stack_horizontal") ? { ...DEF_GRID, top:20  } : DEF_GRID,
                 series: nc.map(arra => {
-                    let sery:SeriesOption = {
+                    const sery:SeriesOption = {
                         type: etype ?? 'line', data: arra.vals, 
                         name: arra.name,
                         stack: stacked ? '总量' : undefined,
@@ -678,7 +719,7 @@ class EChart extends Component<EChartProps & { chartType:ChartType }> {
                 }),
             }
 
-            let myOptions:EChartsOption = carefulOverride(options,this.props.subConfig, isHorizontal);
+            const myOptions:EChartsOption = carefulOverride(options,this.props.subConfig, isHorizontal);
             return <ReactECharts option={myOptions} theme={getThm(this.context)} replaceMerge={REP}   onEvents={this.onEvents}/>;
         } catch {
             return <ChartHelp chartType={chartType} />
@@ -710,7 +751,7 @@ class EScatter extends Component<EChartProps & {etype: "scatter" | "bubble" }> {
         // For bubble assume every other column is size, remove it from nc
         const isBubble = etype === "bubble";
         if (isBubble) {
-            let newNC = nc.slice(0, 0);
+            const newNC = nc.slice(0, 0);
             sizeCols = [];
             for (let i = 0; i < nc.length; i++) {
                 newNC.push(nc[i++]);
@@ -734,7 +775,7 @@ class EScatter extends Component<EChartProps & {etype: "scatter" | "bubble" }> {
                     } else {
                         sdata = arra.vals.map((v, idx) => [xAxis.vals[idx], v, srs.chartRS.rowLabels[idx]]);
                     }
-                    let s: any = {
+                    const s: any = {
                         type: 'scatter',
                         data: sdata,
                         name: arra.name,
@@ -755,7 +796,7 @@ class EScatter extends Component<EChartProps & {etype: "scatter" | "bubble" }> {
                     return s;
                 }),
             }
-            let myOptions:EChartsOption = carefulOverride(options,this.props.subConfig);
+            const myOptions:EChartsOption = carefulOverride(options,this.props.subConfig);
             return <ReactECharts option={myOptions} theme={getThm(this.context)} replaceMerge={REP} onEvents={this.onEvents} />;
         } catch {
             return <ChartHelp chartType={etype} />
@@ -850,7 +891,7 @@ class ECandleSeries extends Component<EChartProps> {
                 series: noVol ? candleSeries : [candleSeries,{ name: 'Volume', type: 'bar', xAxisIndex: 1, yAxisIndex: 1, data: candleData.volume, itemStyle:{opacity:0.8 } }]
             };
 
-            let myOptions:EChartsOption = carefulOverride(canNOToption, this.props.subConfig);
+            const myOptions:EChartsOption = carefulOverride(canNOToption, this.props.subConfig);
             return <ReactECharts option={myOptions} theme={getThm(this.context)} replaceMerge={REP} onEvents={this.onEvents}  />;
         } catch {
             return <ChartHelp chartType="candle" />
@@ -861,6 +902,7 @@ class ECandleSeries extends Component<EChartProps> {
 export function ChartHelp(props:{chartType:ChartType, reason?:string}) {
     const cHelp = getChartHelpFor(props.chartType);
     const { reason } = props;
+    if(!cHelp) { return <></>; }
     return <div>
             <NonIdealState icon="error" title={reason}>
                 Try changing a query setting in the editor
@@ -903,16 +945,16 @@ class ECalendar extends Component<EChartProps> {
       };
 
     render() {
-        let s = needs({srs:this.props.srs, needsNumbers:1, needsDates:true});
+        const s = needs({srs:this.props.srs, needsNumbers:1, needsDates:true});
         if(s !== null) { 
             return <ChartHelp chartType="calendar" reason={s} /> 
         }
         function getDataForYear(srs: SmartRs , year:number) {
             const dates = srs.chartRS.dateColumns[0].vals;
             const nums = srs.chartRS.numericColumns[0].vals;
-            let tvdata = [];
+            const tvdata = [];
             for(let i=0; i<dates.length; i++) {
-                let d = dates[i];
+                const d = dates[i];
                 if(d.getFullYear() === year) {
                     tvdata.push([d.toISOString().split('T')[0], nums[i]]);
                 }
@@ -928,14 +970,14 @@ class ECalendar extends Component<EChartProps> {
                 return { type: 'heatmap', coordinateSystem: 'calendar', calendarIndex: idx, data: getDataForYear(srs, year), name:srs.chartRS.numericColumns[0].name}
             });
 
-            let option:EChartsOption = {
+            const option:EChartsOption = {
                 tooltip: { ...getTooltipDefaults(this.context.theme), position: 'top'},
                 visualMap: { min: valRange[0], max: valRange[1], calculable: true, orient: 'vertical', left: 'left', top: 'center' },
                 // @ts-ignore
                 calendar: calendars, series: series,
                 grid:DEF_GRID,
             };
-            let myOptions:EChartsOption = carefulOverride(option, this.props.subConfig);
+            const myOptions:EChartsOption = carefulOverride(option, this.props.subConfig);
             return <ReactECharts option={myOptions} theme={getThm(this.context)} replaceMerge={REP} onEvents={this.onEvents} />;
         } catch {
             return <ChartHelp chartType="calendar" /> 
@@ -959,7 +1001,7 @@ class ERadar extends Component<EChartProps> {
         try {
             const srs = this.props.srs;
 
-            let s = needs({srs:this.props.srs, needsNumbers:1});
+            const s = needs({srs:this.props.srs, needsNumbers:1});
             if(s !== null) { 
                 return <ChartHelp chartType="radar" reason={s} /> 
             }
@@ -968,7 +1010,7 @@ class ERadar extends Component<EChartProps> {
             const legends = srs.chartRS.rowLabels;
             const data = legends.map((rowLabel, row) => {return { value:srs.chartRS.numericColumns.map(nc => nc.vals[row]), name:rowLabel}});
             
-            let option:EChartsOption = {
+            const option:EChartsOption = {
                 legend:{ data: legends, show:srs.count() <= 10 }, // No point showing massive legend overdrawing the chart
                 radar: { indicator: indicators, },
                 series: [ { type: 'radar', data: data, areaStyle: { } } ],
@@ -976,7 +1018,7 @@ class ERadar extends Component<EChartProps> {
                 animation:false,
               };
 
-            let myOptions:EChartsOption = carefulOverride(option, this.props.subConfig);
+            const myOptions:EChartsOption = carefulOverride(option, this.props.subConfig);
             return <>{srs.count() > 500 ? 
                 <NonIdealState icon="error" title="Too Many Rows" >
                     Radar with &gt; 500 rows, where each row is a color, does not make sense.
@@ -993,8 +1035,8 @@ class ERadar extends Component<EChartProps> {
 type sym = 'circle' | 'rect' | 'roundRect' | 'triangle' | 'diamond' | 'pin' | 'arrow' | 'none';
 function toNameSymbols(tnc: string[]): { name: string, sdname: string, sym: sym }[] {
     function toSymbol(sdname: string): sym {
-        let s = sdname.toLowerCase();
-        let names: Array<sym> = ['circle', 'rect', 'roundRect', 'triangle', 'diamond', 'pin', 'arrow', 'none'];
+        const s = sdname.toLowerCase();
+        const names: Array<sym> = ['circle', 'rect', 'roundRect', 'triangle', 'diamond', 'pin', 'arrow', 'none'];
         for (const n of names) {
             if (s.endsWith(n.toLowerCase())) {
                 return n;
@@ -1004,9 +1046,9 @@ function toNameSymbols(tnc: string[]): { name: string, sdname: string, sym: sym 
     }
 
     return tnc.map(name => {
-        let p = name.toLowerCase().indexOf("_sd_");
-        let sdname = p === -1 ? name : name.substring(0, p);
-        let sym = p === -1 ? "none" : toSymbol(name.substring(p));
+        const p = name.toLowerCase().indexOf("_sd_");
+        const sdname = p === -1 ? name : name.substring(0, p);
+        const sym = p === -1 ? "none" : toSymbol(name.substring(p));
         return { name: name, sdname, sym };
     });
 }
@@ -1018,7 +1060,7 @@ function addTSclickHandler(echartRef:ReactECharts, setArgTyped:SetArgsType) {
         zr.on('click', (e:any) => { 
             const pointInPixel = [e.offsetX, e.offsetY];
             const pointInGrid = eChart.convertFromPixel('grid', pointInPixel);    
-            let r:{[k:string]:any} = {ts:new Date(pointInGrid[0]), val:pointInGrid[1]};
+            const r:{[k:string]:any} = {ts:new Date(pointInGrid[0]), val:pointInGrid[1]};
             // If only showing one series, we can set it.
             if(eChart.getOption().series) {
                 const s = eChart.getOption().series;
@@ -1042,23 +1084,24 @@ class ETimeSeries extends Component<EChartProps> {
         try {
             const srs = this.props.srs;
 
-            let s = needs({srs:this.props.srs, needsNumbers:1, needsDates:true});
+            const s = needs({srs:this.props.srs, needsNumbers:1, needsDates:true});
             if(s !== null) { 
                 return <ChartHelp chartType="timeseries" reason={s} /> 
             }
-            let timCol = srs.chartRS.dateColumns[0];
-            let tnc = srs.chartRS.numericColumns.filter(nc => !nc.name.toUpperCase().endsWith("_SD_SIZE"));
+            const timCol = srs.chartRS.dateColumns[0];
+            const tnc = srs.chartRS.numericColumns.filter(nc => !nc.name.toUpperCase().endsWith("_SD_SIZE"));
             const nameSymbols = toNameSymbols(tnc.map(nc => nc.name));
-            let headers = [...[timCol.name], ...tnc.map(tc => tc.name)];
-            let dDayData = timCol.vals.map((dt, idx) => {
-                let a: (string | number)[] = [dt.toISOString()];
+            const headers = [...[timCol.name], ...tnc.map(tc => tc.name)];
+            const dDayData = timCol.vals.map((dt, idx) => {
+                const a: (string | number)[] = [dt.toISOString()];
                 tnc.forEach(nc => a.push(nc.vals[idx]));
                 return a;
             })
             const isSingle = tnc.length === 1;
-            var hadSymbol = false;
+            let hadSymbol = false;
             const symCols = nameSymbols.filter(ns => ns.sym !== "none");
 
+            const timFormatter = getTooltipFormatter(timCol.name, srs.rsdata.tbl.types[timCol.name]);
             const options: EChartsOption = {
                 legend: { show: symCols.length > 0,  data: symCols.map(sc => sc.sdname)  },
                 grid: { right: '65px', left: '8%', top: '5%', bottom: '5.12%' },
@@ -1070,7 +1113,7 @@ class ETimeSeries extends Component<EChartProps> {
                 yAxis: [{ scale: true, splitLine: { show: true, lineStyle: { type: 'dashed' } }, alignTicks:true },
                         { scale: true, splitLine: { show: true, lineStyle: { type: 'dashed' } }, alignTicks:true }],
                 series: tnc.map((tc, idx) => {
-                    let isSymbol = nameSymbols[idx].sym !== "none";
+                    const isSymbol = nameSymbols[idx].sym !== "none";
                     hadSymbol = hadSymbol || isSymbol;
                     return {
                         name: nameSymbols[idx].sdname,
@@ -1079,7 +1122,7 @@ class ETimeSeries extends Component<EChartProps> {
                         animation: true,
                         symbol: nameSymbols[idx].sym,
                         symbolSize: function (value: any, params: Object) {
-                            let a = srs.chartRS.numericColumns.find(nc => nc.name.toUpperCase() === nameSymbols[idx].sdname.toUpperCase()+"_SD_SIZE");
+                            const a = srs.chartRS.numericColumns.find(nc => nc.name.toUpperCase() === nameSymbols[idx].sdname.toUpperCase()+"_SD_SIZE");
                             // @ts-ignore
                             return a === undefined ? 5 : a.vals[params.dataIndex];
                         },
@@ -1107,13 +1150,14 @@ class ETimeSeries extends Component<EChartProps> {
                 // These lines are duped in candlestick
                 tooltip: {
                     ...getTooltipDefaults(this.context.theme),
-                    trigger: 'axis', axisPointer: { type: 'cross', label: { precision: 4 } },
+                    trigger: 'axis', 
+                    axisPointer: {  type: 'cross', label: { precision:4,  formatter:(param:any) => timFormatter(new Date(param.value)), } },
                 },
             };
             // If only one series, shade it in and add markers.
             if (Array.isArray(options.series) && options.series.length === 1) {
                 //@ts-ignore
-                let markLine: MarkLineOption = {
+                const markLine: MarkLineOption = {
                     symbol: ['none'],
                     silent: true, precision: 4,
                     data: [
@@ -1141,7 +1185,7 @@ class ETimeSeries extends Component<EChartProps> {
                 });
             }
 
-            let latestOptions:EChartsOption = carefulOverride(options,this.props.subConfig);
+            const latestOptions:EChartsOption = carefulOverride(options,this.props.subConfig);
             return <ReactECharts option={latestOptions} theme={getThm(this.context)}
                             replaceMerge={REP} ref={(e) => { this.echartRef = e; }} />;
         } catch {
@@ -1166,7 +1210,7 @@ class EBoxPlot extends Component<EChartProps> {
     // Assumes each numericColumn has 5 values   (min, Q1, avg, Q3, max)
     toBoxPlotOption(srs: SmartRs, theme: ThemeType): any {
         const ncs = srs.chartRS.numericColumns;
-        let option = {
+        const option = {
             xAxis: {type: 'category', data: ncs.map(n => n.name)},
             yAxis: { type: 'value', }, 
             series: ncs.map(n => { return { type: 'boxplot', data:[n.vals]} }),
@@ -1178,7 +1222,7 @@ class EBoxPlot extends Component<EChartProps> {
     // Each column represents a data set whos min/avg/med will be calculated. Obviously inefficient but handy to chart existing data.
     toBoxPlotOption3(srs: SmartRs, theme: ThemeType): any {
         const ncs = srs.chartRS.numericColumns;
-        let option = {
+        const option = {
             dataset: [
                     {source:ncs.map(n => n.vals)}, 
                     {fromDatasetIndex:0,  transform: { type: 'boxplot',config: { itemNameFormatter: (params:any) => params.value}}}
@@ -1210,12 +1254,12 @@ class EBoxPlot extends Component<EChartProps> {
 
     render() {
         const { srs, theme } = this.props;
-        let s = needs({srs:this.props.srs, needsNumbers:1});
+        const s = needs({srs:this.props.srs, needsNumbers:1});
         if(s !== null) { 
             return <ChartHelp chartType="boxplot" reason={s} /> 
         }
         try {
-            let myOptions:EChartsOption = carefulOverride(this.toBoxPlotOption3(srs, theme), this.props.subConfig);
+            const myOptions:EChartsOption = carefulOverride(this.toBoxPlotOption3(srs, theme), this.props.subConfig);
             return <ReactECharts option={myOptions} theme={getThmT(theme)} replaceMerge={REP} onEvents={this.onEvents}/>;
         } catch {
             return <ChartHelp chartType="boxplot" />
@@ -1235,7 +1279,7 @@ class ESunburst extends Component<EChartProps & { chartType:"sunburst"|"tree"}> 
 
         function getChildren(depth:number, parentName:string) {
             const isLeaf = depth === scs.length - 1;
-            let res:leaf[] = [];
+            const res:leaf[] = [];
             for(let row=0; row<scs[0].vals.length; row++) {
                 if(depth === 0 || scs[depth-1].vals[row] === parentName) {
                     const name = scs[depth].vals[row];
@@ -1250,9 +1294,9 @@ class ESunburst extends Component<EChartProps & { chartType:"sunburst"|"tree"}> 
             }
             return res;
         }
-        let data = getChildren(0, "");
+        const data = getChildren(0, "");
 
-        let option = {
+        const option = {
             series: {
               type: chartType,
               data: isTree ? [{name:ncs[0].name, children:data}] : data,
@@ -1271,12 +1315,12 @@ class ESunburst extends Component<EChartProps & { chartType:"sunburst"|"tree"}> 
 
     render() {
         const { srs, theme, chartType } = this.props;
-        let s = needs({srs:this.props.srs, needsNumbers:1});
+        const s = needs({srs:this.props.srs, needsNumbers:1});
         if(s !== null) { 
             return <ChartHelp chartType={chartType} reason={s} /> 
         }
         try {
-            let myOptions:EChartsOption = carefulOverride(this.toSunburstOption(srs, theme, chartType), this.props.subConfig);
+            const myOptions:EChartsOption = carefulOverride(this.toSunburstOption(srs, theme, chartType), this.props.subConfig);
             return <ReactECharts option={myOptions} theme={getThmT(theme)} replaceMerge={REP} onEvents={this.onEvents} />;
         } catch {
             return <ChartHelp chartType={chartType} />
@@ -1288,254 +1332,12 @@ class ESunburst extends Component<EChartProps & { chartType:"sunburst"|"tree"}> 
 
 /////////////////////////////// HELP //////////////////////////////////////////
 
-export default interface ChartTypeHelp {
-    chartType: ChartType;
-    /** a textual description of this chart type */
-    description: string;
-    /** Simplest Example TestCase */
-    testCase: TestCase;
-    /** An explanation of the Data Table format best used and how it affects what is displayed. */
-    formatExplainationHtml: JSX.Element;
-    /**  @return Examples of queries.   */
-    examples: Array<ExampleView>;
-    icon: string;
-}
-
-class ChartTypeHelpC implements ChartTypeHelp {
-    constructor(readonly chartType: ChartType, readonly description: string, readonly testCase: TestCase,
-        readonly formatExplainationHtml: JSX.Element, readonly examples: Array<ExampleView> = [], readonly icon: string = "") { }
-}
-class ExampleView { constructor(readonly name: string, readonly description: string, readonly testCase: TestCase) { } }
-class TestCase { constructor(readonly kdbQuery: string, readonly name: string, readonly srs: SmartRs) { } }
-
-
-
-
-export function getChartHelp(): ChartTypeHelp[] {
-    let r: ChartTypeHelp[] = [];
-    let simpleFormatExplain = <ul>
-        <li>The first string columns are used as category labels.</li>
-        <li>Whatever numeric columns appear after the strings represents a separate series in the chart.</li>
-    </ul>;
-
-    const timeSeriesExplain = <ol>
-        <li>The first date/time column found will be used for the x-axis.</li>
-        <li>Each numerical column represents one time series line on the chart.</li>
-    </ol>;
-    
-    const calendarFormatExplain = <ul>
-        <li>The table should contain a date and atleast one numeric column.</li>
-        <li>The first numeric column will be used as the value for that date.</li>
-        <li>Dates should not be repeated. If they are the value selected is not guaranteed.</li>
-        </ul>;
-
-    const candleFormatExplain = <ul>
-        <li>The table should contain columns labelled open/high/low/close/volume.</li>
-        <li>The table must atleast contain high/low or open/close to allow it to be drawn.</li>
-        </ul>;
-        
-    const pieFormatExplain = <ul>
-        <li>Each numeric column represents one pie chart. The title of each pie chart will be the column title.</li>
-        <li>The segments of the pie chart use the string columns as a title where possible.
-            If there are no string columns, row numbers are used.
-        </li>
-    </ul>;
-    
-    const scatterFormatExplain = <ul>
-        <li>Two or more numeric columns are required.</li>
-        <li>The values in the first column are used for the X-axis.</li>
-        <li>The values in following columns are used for the Y-axis. Each column is displayed with a separate color.</li>
-    </ul>;
-
-    const radarFormatExplain = <ul>
-        <li>A radar chart requires 3 or more numeric columns to render sensibly.</li>
-        <li>Each numeric column represents one spoke in the radar. The column titles are used as spoke titles.</li>
-        <li>Each row in the data represents one circle withing the radar.</li>
-    </ul>;
-
-    const bubbleFormatExplain = <ul>
-        <li>The first string columns are used as category labels.</li>
-        <li>There must then be 3 numeric columns which are used for x-coord, y-coord, size in that order.</li>
-    </ul>;
-
-    const surfaceFormatExplain = <ul>
-        <li>Three numeric columns are required.</li>
-        <li>The 3 numeric columns represent x-coord, y-coord, z-coord in that order.</li>
-        </ul>;
-
-    const gridFormatExplain = <ul>
-        <li>Data table where everything exept special _SD_ columns are shown.</li>
-        <li>Columns can have formatters set based on name or stored preferences.</li>
-        <li>Rows can have individual highlighting OR fully specified HTML content.</li>
-        </ul>;
-    
-    const treeFormatExplain = <ul>
-        <li>Starting from the left each string column is taken as one nesting level</li>
-        <li>The first numerical column will be taken as size.</li>
-    </ul>;
-
-    const metricsFormatExplain = <ul>
-        <li>Each numerical column in the table becomes one panel in the metrics.</li>
-        <li>The latest value (bottom of table) is displayed prominently in large writing.</li>
-        <li>Optionally multiple rows will be used to create a shaded line/bar chart in the background.</li>
-    </ul>;
-
-    const heatmapFormatExplain = <ul>
-        <li>Each numerical column in the table becomes one column in the chart.</li>
-        <li>The numerical values represent the shading within the chart.</li>
-    </ul>;
-
-
-    const boxplotFormatExplain = <ul>
-        <li>Each numerical column in the table becomes one boxplot item in the chart.</li>
-        <li>The min/max/median/Q1/Q3 are calculated from the raw data.</li>
-        <li>This is inefficient as a lot more data is being passed than needed but useful for toggling an existing data set view quickly.</li>
-    </ul>;
-
-    r.push(new ChartTypeHelpC("candle", "Candlestick Chart", ExampleTestCases.OHLC_TESTCASE, candleFormatExplain));
-
-    r.push(new ChartTypeHelpC("area", "Area Chart", ExampleTestCases.COUNTRY_STATS, simpleFormatExplain));
-    r.push(new ChartTypeHelpC("line", "Line Chart", ExampleTestCases.COUNTRY_STATS, simpleFormatExplain));
-    r.push(new ChartTypeHelpC("bar", "Bar Chart", ExampleTestCases.COUNTRY_STATS, simpleFormatExplain));
-    r.push(new ChartTypeHelpC("bar_horizontal", "Horizontal Bar Chart", ExampleTestCases.COUNTRY_STATS, simpleFormatExplain));
-    r.push(new ChartTypeHelpC("stack", "Stacked Bar Chart", ExampleTestCases.COUNTRY_STATS, simpleFormatExplain));
-    r.push(new ChartTypeHelpC("stack_horizontal", "Horizontal Stacked Bar Chart", ExampleTestCases.COUNTRY_STATS, simpleFormatExplain));
-
-    r.push(new ChartTypeHelpC("pie", "Pie Chart", ExampleTestCases.COUNTRY_STATS, pieFormatExplain));
-    r.push(new ChartTypeHelpC("scatter", "Scatter Graph", ExampleTestCases.COUNTRY_STATS, scatterFormatExplain));
-    r.push(new ChartTypeHelpC("bubble", "Bubble Map", ExampleTestCases.COUNTRY_STATS, bubbleFormatExplain));
-    r.push(new ChartTypeHelpC("radar", "Radar", ExampleTestCases.COUNTRY_STATS, radarFormatExplain));
-    r.push(new ChartTypeHelpC("calendar", "Calendar Heatmap", ExampleTestCases.CALENDAR_TESTCASE, calendarFormatExplain));
-    
-    r.push(new ChartTypeHelpC("heatmap", "Heatmap", ExampleTestCases.COUNTRY_STATS, heatmapFormatExplain));
-    r.push(new ChartTypeHelpC("treemap", "Treemap", ExampleTestCases.COUNTRY_STATS, treeFormatExplain));
-
-    r.push(new ChartTypeHelpC("grid", "Data Grid", ExampleTestCases.COUNTRY_STATS, gridFormatExplain));
-    r.push(new ChartTypeHelpC("timeseries", "Time-Series Chart", ExampleTestCases.COUNTRY_STATS, timeSeriesExplain));
-
-    r.push(new ChartTypeHelpC("boxplot", "Boxplot", ExampleTestCases.COUNTRY_STATS, boxplotFormatExplain));
-    r.push(new ChartTypeHelpC("3dsurface", "3D Surface", ExampleTestCases.COUNTRY_STATS, surfaceFormatExplain));
-    r.push(new ChartTypeHelpC("3dbar", "3D Bar Chart", ExampleTestCases.COUNTRY_STATS, surfaceFormatExplain));
-    r.push(new ChartTypeHelpC("sunburst", "Sunburst", ExampleTestCases.COUNTRY_STATS, treeFormatExplain));
-    r.push(new ChartTypeHelpC("tree", "Tree", ExampleTestCases.COUNTRY_STATS, treeFormatExplain));
-    r.push(new ChartTypeHelpC("metrics", "Metrics", ExampleTestCases.COUNTRY_STATS, metricsFormatExplain));
-
-    
-
-    return r;
-}
-
-export function getChartHelpFor(chartType:ChartType): ChartTypeHelp { return getChartHelp().find(c => c.chartType === chartType)!; }
-
-function getKdbDemoQueryable(ct: ChartType):string {
-    switch(ct) {
-        case "timeseries": 
-            return "// Time Series display can be configured by column names. See help->timeseries for details"
-            + "\n{  walk:{ [seed;n]"
-                + "\n\t r:{{ abs ((1664525*x)+1013904223) mod 4294967296}\\[y-1;x]};"
-                + "\n\t prds (100+((r[seed;n]) mod 11)-5)%100};"
-                + "\n\t c:{x mod `long$00:20:00.0t}x;   st:x-c;   cn:`long$c%1000;"
-                + "\n\t ([] time:.z.d+st+1000*til cn; gold:walk[100;cn]; bitcoin:walk[2;cn])  }[.z.t]";  
-        case "bar": 
-        case "stack": 
-        case "bar_horizontal": 
-        case "stack_horizontal": 
-        case "line": 
-        case "area": 
-        case "pie": return "// See help->charts for details on format to customize your chart appearance"
-            + "\n([] Company:`Microsoft`Oracle`Paypal`Monero`FXC`Braint`MS`UBS; "
-            + "\n\t  PnL:(0.8+rand[0.2])*31847.0 13239.0 127938.0 81308.0 63047.0 13010.0 152518.0 166629.0;"
-            + "\n\t  Revenue:(0.9+rand[0.1])*15080.0 11300.0 34444.0 3114.0 2228.0 88.9 1113.0 41196.0 ; "
-            + "\n\t  Negatives:(0.95+rand[0.05])*48300.0 8400.0 34700.0 38100.0 36500.0 413.0 1788.0 11732.0 )";
-        case "treemap":
-        case "heatmap":
-        case "scatter": 
-        case "bubble": return "// The first numeric column is x-axis, 2nd is y-axis, 3rd is bubble size. Strings are used as labels. \n"
-                + "update exports:(0.1+9?0.1)*GDP, exportsPerCapita:(0.4+9?0.1)*GDPperCapita from "
-                + "\n\t  ([] Country:`US`France`japan`Germany`UK`Zimbabwe`Bangladesh`Nigeria`Vietnam; "
-                + "\n\t  Population:(0.9+9?0.2)*313847.0 213847.0 127938.0 81308.0 63047.0 13010.0 152518.0 166629.0 87840.0 ;"
-                + "\n\t  GDP:(0.9+9?0.2)*15080.0 3333. 4444.0 3114.0 2228.0 9.9 113.0 196.0 104.0 ; "
-                + "\n\t  GDPperCapita:(0.9+9?0.2)*0.001*48300.0 37000 34700.0 38100.0 36500.0 413.0 1788.0 732.0 3359.0)";
-        case "radar":  return "([] portfolio:`threadneedle`diamonte; agri:100 10; realEstate:100 10; tech:0 80; growthPotential:50 100; finance:60 20) \n";
-        case "candle": return  "// Column names are used to identify Open/High/low/Close/Volume\n"
-                            + "{  r:{{ abs ((1664525*x)+1013904223) mod 4294967296}\\[y-1;x]};"
-                            + "\n\twalk:{ [r;seed;n] prds (100+((r[seed;n]) mod 11)-5)%100}[r;;];"
-                            + "\n\tc:{x mod `long$00:05:00.0t}x;   st:x-c;   cn:100+`long$c%1000;"
-                            + "\n\tt:([] time:`second$.z.d+st+1000*til cn; open:walk[9;cn]; close:walk[105;cn]);"
-                            + "\n\t-100 sublist update low:?[open > close;close;open]-(r[11;cn] mod 11)*0.02,high:?[open < close;close;open]+(r[44;cn] mod 11)*0.02,volume:(r[44;cn] mod 110) from t}[.z.t]";;
-        case "calendar": return "// A date and value column must be supplied. \n" + ExampleTestCases.CALENDAR_TESTCASE.kdbQuery;
-        case "grid": 
-            return "// Table display can be configured using column names. See help->charts for details on format."
-                + "\nupdate percbar_SD_DATABAR:percent_SD_PERCENT0 ,bid_SD_FG:((`$(\"#FF6666\";\"#66FF66\";\"\"))!`$(\"#222\";\"#222\";\"\")) bid_SD_BG from  "
-                + "\n\t ([] time:.z.t-til 50; "
-                + "\n\t\t status:50?`partial`filled; "
-                + "\n\t\t instrument:50?`GBPUSD`USDNZD`USDCAD`CHFJPY`EURUSD;"
-                + "\n\t\t symbol_SD_TAG:50?`UBS`C`MS`HSBC`NOMURA`DB;"
-                + "\n\t\t price_SD_CURUSD:50?100.0;"
-                + "\n\t\t bid:50?20.0;"
-                + "\n\t\t bid_SD_BG:50?`$(\"#FF6666\";\"\";\"\";\"\";\"\";\"\";\"\";\"\";\"\";\"\";\"\";\"\";\"\";\"#66FF66\");"
-                + "\n\t\t bid_SD_CODE:50?(\"0.xXXx\";\"0.XXx\";\"0.xxXX\");"
-                + "\n\t\t percent_SD_PERCENT0:50?1.0 )";
-        case "metrics":
-        case "boxplot": return "([] gold:10?10; silver:til 10; crude:desc til 10; slick:13-til 10; copper:10?3; iron:10?8; diamond:4+10?8; rubber:6+10?10; lead:8+10?12)";
-        case "sunburst": 
-        case "tree":
-            return "([] Continent:`NA`Asia`Asia`Europe`Asia`Europe`Europe`SA`Europe`NA`Europe`Asia`Australia`Europe`NA;"
-            + "\n\t  TradingBloc:`US`China`Japan`EU`India`UK`EU`Brazil`EU`US`Russia`SouthKorea`Australia`EU`US; "
-            + "\n\t  Country:`US`China`Japan`Germany`India`UK`France`Brazil`Italy`Canada`Russia`SouthKorea`Australia`Spain`Mexico; "
-            + "\n\t  GDP:19.485 12.238 4.872 3.693 2.651 2.638 2.583 2.054 1.944 1.647 1.578  1.531 1.323 1.314 1.151 )";
-        case "3dsurface": 
-        case "3dbar":
-            return "update z:sin y from ([] x:(til 1000) mod 20; y:(til 1000)%100+rand[22])";
-    }
-}
-
-
-export function getH2DemoQueryable(ct: ChartType):string {
-    switch(ct) {
-        case "timeseries":  return "SELECT TIME,BID,ASK FROM quote WHERE NAME='NFLX' AND TIME>timestampadd(minute,-20,date_trunc('minute',CURRENT_TIMESTAMP())) ORDER BY TIME ASC;"
-        case "bar": 
-        case "stack": 
-        case "bar_horizontal": 
-        case "stack_horizontal": 
-        case "line": 
-        case "area":  return "select name, quantity,mid from position WHERE name<>'BRK.A'AND name<>'GOOG';";
-        case "pie": return "select name,quantity from position ORDER BY quantity DESC LIMIT 7";
-        case "treemap":
-        case "heatmap":
-        case "scatter": 
-        case "bubble":  return "select NAME,MARKETVALUE,PNL,QUANTITY/5.  From position WHERE NAME<>'BRK.A' AND NAME<>'BABA' AND NAME<>'GOOG';";
-        case "candle": return "select time,open,high,low,close,volume from candle ORDER BY time asc;";
-        case "calendar": return "select date,close from vix;";
-        case "grid":  
-            return "SELECT `time`,`STATUS`,SYMBOL AS SYMBOL_SD_TAG,`INSTRUMENT NAME`,QUANTITY AS QUANTITY_SD_NUMBER0,"
-                + "\n\t DESTINATION,ORDERTYPE AS ORDERTYPE_SD_TAG, PRICE AS PRICE_SD_CURUSD,"
-                + "\n\t `PERCENT DONE` AS PERCENT_SD_PERCENT0, `AVG PX`, `PERCENT DONE` AS PERCENT_SD_DATABAR,"
-                + "\n\t `UPNL` AS UPNL_SD_CURUSD"
-                + "\nFROM TRADE ORDER BY TIME DESC LIMIT 300;";
-        case "radar": return "select  name,mid,pnl,quantity,marketvalue,mid  From position ORDER BY quantity DESC,pnl desc LIMIT 8;";
-        case "metrics": 
-        return "select 2+rand()*open AS gold, 4+rand()*2*high AS silver,2+rand()*1.5*low as crude, 2.2+rand()*3*close AS slick,"
-            + "\n\t 1.5+rand()*open AS copper"
-            + "\n\t from candle ORDER BY time asc LIMIT 15;";
-        case "boxplot": 
-            return "select 2+rand()*open AS gold, 4+rand()*2*high AS silver,2+rand()*1.5*low as crude, 2.2+rand()*3*close AS slick,"
-            + "\n\t 1.5+rand()*open AS copper,1+rand()*2*high AS iron,4+rand()*1.5*low as diamond,rand()*3*close AS rubber, 1+rand()*3*close AS lead"
-            + "\n\t from candle ORDER BY time asc;";
-        case "3dsurface": 
-        case "3dbar":
-            return "select mod(rownum()-1,5) as x,(rownum()-1)/40.0 as y,sin((rownum()-1)/(40.0+floor(3*rand()))) as z from vix";
-        case "sunburst": 
-        case "tree":
-            return "select ORDERTYPE,SYMBOL,SUM(QUANTITY) from trade GROUP BY ORDERTYPE,SYMBOL ORDER BY ORDERTYPE,SYMBOL LIMIT 36;";
-    }
-}
 
 // For a selected database / type and chartType provide a sensibble query that will demo what that chart is capable of.
 function getDemoQueryable(serverConfig:ServerConfig | undefined, ct: ChartType) {
-    let qry = undefined;
-    qry = serverConfig?.jdbcType === "KDB" ? getKdbDemoQueryable(ct) : getH2DemoQueryable(ct);
-    return new Queryable(serverConfig?.name ?? "", qry, 5000);
+    const qry = serverConfig?.jdbcType === "REDIS" ? "" :
+                "\r\n// DEMO QUERY - DELETE AND REPLACE ME\r\n\r\n" + (serverConfig?.jdbcType === "KDB" ? getKdbDemoQueryable(ct) : getH2DemoQueryable(ct));
+    return new Queryable(serverConfig?.name ?? "", qry, 5000, "");
 }
 
 function getReName(nm:string, subConfig: SubConfig): string {
@@ -1547,7 +1349,7 @@ function getReName(nm:string, subConfig: SubConfig): string {
  * Also careful because it relies on ALL charts having a very specific series/tooltip data structure. 
  * e.g. Radar options are not a good fit but luckily don't collide to a broken setup.
  */
-export function carefulOverride(options: EChartsOption, subConfig: SubConfig, isHorizontal:boolean = false): EChartsOption {
+export function carefulOverride(options: EChartsOption, subConfig: SubConfig, isHorizontal = false): EChartsOption {
     const mergeSeries = (sery:SeriesOption) => {
         const nm = sery.name as string;
         const colConfig = subConfig.colConfig;
@@ -1561,6 +1363,11 @@ export function carefulOverride(options: EChartsOption, subConfig: SubConfig, is
             const formatter = SFormatters.getFormatter(colNameUsed, "number"); // terrible HACK!!!
             set(sery, "tooltip.valueFormatter", (value:any) => formatter(0, 0, value, null, null));
         }
+        // subConfig editor can only set everything to one type. step can be true/false or string. So convert.
+        const s = get(sery,"step",undefined);
+        if(s !== undefined) {
+            set(sery,"step", (s === "false" ? false : s === "true" ? true : s));
+        }
         return sery;
     }
 
@@ -1573,7 +1380,7 @@ export function carefulOverride(options: EChartsOption, subConfig: SubConfig, is
                 // opt = {xAxis:{},yAxis:[{},{}]}
                 // opt = {xAxis:[{}.{}],yAxis:{}} - this occurs when horizontal
                 // overrideJson = { xAxis:{}, yAxis:[{},{}]} OR { xAxis:[{},{}], yAxis:{}} when horizontal
-                let customizer = (objValue:any, srcValue:any, key:any, object:any, source:any, stack:any) => {
+                const customizer = (objValue:any, srcValue:any, key:any, object:any, source:any, stack:any) => {
                     // If only override is an array. Use first item as override
                     const isAxis = key === "yAxis" || key === "xAxis";
                     if(isAxis && !Array.isArray(objValue) && Array.isArray(srcValue) && srcValue.length > 0) {
@@ -1614,7 +1421,9 @@ export function carefulOverride(options: EChartsOption, subConfig: SubConfig, is
             }
             return opt;
         }
-    } catch (e) {}
+    } catch (e) {
+        // Ignore
+    }
     return options;
 }
 

@@ -8,6 +8,10 @@
 @import 'slickgrid/controls/slick.gridmenu.css';
 @import 'slickgrid/controls/slick.columnpicker.css';
 
+/** blueprint.css line 7 has  box-sizing:inherit. Which seems to break col-lg-5 etc. **/
+
+
+
 
 body {
   margin: 0;
@@ -81,9 +85,6 @@ fieldset { border:1px solid $greyyc-c}
 /**************************** .Collapsible *****************************/
 // defined within dashboardPage to reduce scope.
 .dashboardPage {
-  #SubConfigEditor {
-    .aform .bp4-input { height:auto; }
-  }
   // .Collapsible { background-color: transparent; }
 
   .Collapsible__contentInner {
@@ -624,12 +625,6 @@ fieldset { border:1px solid $greyyc-c}
   width: 600px;
 }
 
-#dashfooter ul {
-  position: fixed;
-  bottom: -15px;
-  z-index: -1;
-}
-
 a:hover {
   text-decoration: none !important;
 }
@@ -719,6 +714,8 @@ a:hover {
   float: left;
   margin: 0 5px;
 }
+
+#editor2  .autocompletecls { z-index:13; }
 
 #editor2 table td { padding:0; vertical-align: middle; text-align: center;  }
 #editor2 table button { margin:0; padding:0 }
@@ -922,10 +919,14 @@ a:hover {
 
     .dynamichtml { margin:5px;}
 }
-
-
-
 /**************************** .dashboardpage - END *****************************/
+
+
+/**************************** .reportPage -  *****************************/
+.reportPage .row { clear:left; width:100%; }
+.reportPage .repcol { width:49%; float:left; overflow:auto; text-align: center;}
+.reportPage .scroller { height:90vh; width:49%; float:left; overflow:auto;}
+.reportPage .dynamichtml { width:10x;}
 
 
 /**************************** .dashpage - i.e. The page listing all of the dashboards *****************************/
@@ -942,7 +943,9 @@ a:hover {
 /**************************** .dashpage - END *****************************/
 
 /**************************** .connectionpage - i.e. The page listing all of the connections *****************************/
-.connectionpage {}
+.connectionpage {
+  .urlHostRadio label { display:inline; }
+}
 /**************************** .connectionpage - END *****************************/
 
 /**************************** .sqleditorpage   *****************************/
@@ -1040,8 +1043,6 @@ table.bp4-html-table-condensed th {
 /* ###############     Floatbox - start */
 
 // floatbox = top title, p shown on hover
-// floatbox2 = background image, foreground title, p shown on hover
-
 
 .dashboxContainer{
   width: 270px;
@@ -1060,23 +1061,24 @@ table.bp4-html-table-condensed th {
   width:150px; height:150px;
 }
 
-
-.Appdark .floatbox,.Appdark .floatbox2 {
+.Appdark .floatbox,.Appdark .greybox {
   border-color:$greyyc-c;
-  background-color: #1F1F22;
+  background-color: $menubg-dark-c; //#1F1F22;
 }
-#dashboardListing .floatbox2:hover,#dashboardListing .floatbox:hover {
+#dashboardListing .floatbox:hover {
   border-color:$blew-c;
 }
-.Appdark .floatbox a,.Appdark .floatbox2 a {
+.Appdark .floatbox a {
   color:#ccc;
 }
 
-.Appdark .floatbox:hover a,.Appdark .floatbox2:hover a {
+.Appdark .floatbox:hover a {
   color:#eee;
 }
 
-.floatbox,.floatbox2 {
+
+.greybox { width:100%; height:100%;  }
+.floatbox,.greybox {
   float: left;
   transition: box-shadow 0.3s;
   border: 1px solid #bbb;
@@ -1087,51 +1089,9 @@ table.bp4-html-table-condensed th {
   text-align: center;
 }
 
-.floatbox:hover,.floatbox2:hover {
+.floatbox:hover {
   box-shadow: 0 0 11px rgba(33, 33, 33, 0.2);
 }
-
-
-.floatbox2:hover { 
-  filter:grayscale(0%);
-}
-.floatbox2 {
-  filter:brightness(150%) contrast(120%);
-  background-size:cover;
-}
-
-.floatbox2 .filler {
-  width: 260px;
-  min-height: 60px;
-}
-
-
-.floatbox2 h4 {
-  width:100%;
-  margin:20px 0;
-  padding:10px;
-  background:#111;
-  color:#EEE;
-  opacity: 0.8;
-}
-
-.floatbox2 div {
-  margin: 0px 2px;
-}
-
-.floatbox2:hover p,.floatbox2:hover h4 {
-  opacity: 0.95;
-  background-color: #111;
-}
-
-.floatbox2 p {
-  margin:0;
-  padding:0;
-  opacity: 0;
-  transition: all 0.2s; /* Use a transition if you want */
-  border-radius: 10px;
-}
-
 
 .floatbox h4 {
   margin: 1px;
@@ -1178,8 +1138,10 @@ table.bp4-html-table-condensed th {
 
 /* Page: Dashboard Listing */
 
-.adebug {
+.Appdark .adebug {
   background:$menubg-dark-c;
+}
+.adebug {
   padding: 2px 5px 30px 5px;
 }
 
@@ -1268,6 +1230,105 @@ table.bp4-html-table-condensed th {
   margin: 0;
 }
 
+
+$blue-gray-darken 	: #2c3e50;
+$blue 				      : #3498db;
+
+
+.App .breadcrumb div.inactive { 
+  a{ background: $blue-gray-darken;  }
+  
+  a{   
+    &:before,
+    &:after{
+      content: "";
+      position:absolute;
+      top: 0;
+      border:0 solid $blue-gray-darken;
+      border-width:10px 10px;
+      width: 0;
+      height: 0;
+    }
+    &:before{
+      left:-20px;
+      border-left-color:transparent;
+    }
+    &:after{
+      left:100%;
+      border-color:transparent;
+      border-left-color:$blue-gray-darken;
+    }
+  }
+}
+
+.pivotconfiger {
+  display: flex;
+  flex-flow: row nowrap;
+  margin-top: 1px;
+  margin-bottom: 0px;
+}
+
+.breadcrumb{
+  list-style:none;
+  display: flex;
+  
+  .icon{
+    font-size: 14px;
+  }
+  
+  div {
+    a{
+      color:#FFF;
+      display:block;
+      background: $blue; 
+      text-decoration: none;
+      position:relative;
+      height: 20px;
+      line-height:20px;
+      padding: 0 10px 0 5px;
+      text-align: center;
+      margin-right: 23px;
+    }
+    &:first-child{
+      a{
+        padding-left:15px;
+        &:before{
+          border:none;
+         }
+      }
+    }
+    &:last-child{
+      a{
+        padding-right:15px;
+        &:after{
+          border:none;
+         }
+      }
+    }
+    
+    a{   
+      &:before,
+      &:after{
+        content: "";
+        position:absolute;
+        top: 0;
+        border:0 solid $blue;
+        border-width:10px 10px;
+        width: 0;
+        height: 0;
+      }
+      &:before{
+        left:-20px;
+        border-left-color:transparent;
+      }
+      &:after{
+        left:100%;
+        border-color:transparent;
+        border-left-color:$blue;
+      }
+    }
+  }
+}
 
 
 /*!

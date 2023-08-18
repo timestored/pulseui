@@ -1,3 +1,29 @@
+/*******************************************************************************
+ *
+ *   $$$$$$$\            $$\                     
+ *   $$  __$$\           $$ |                     
+ *   $$ |  $$ |$$\   $$\ $$ | $$$$$$$\  $$$$$$\   
+ *   $$$$$$$  |$$ |  $$ |$$ |$$  _____|$$  __$$\  
+ *   $$  ____/ $$ |  $$ |$$ |\$$$$$$\  $$$$$$$$ |  
+ *   $$ |      $$ |  $$ |$$ | \____$$\ $$   ____|  
+ *   $$ |      \$$$$$$  |$$ |$$$$$$$  |\$$$$$$$\  
+ *   \__|       \______/ \__|\_______/  \_______|
+ *
+ *  Copyright c 2022-2023 TimeStored
+ *
+ *  Licensed under the Reciprocal Public License RPL-1.5
+ *  You may obtain a copy of the License at
+ *
+ *  https://opensource.org/license/rpl-1-5/
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ ******************************************************************************/
+ 
 import React, { useState } from 'react';
 import { WidgetProperties } from './CommonComponents';
 import  { ArgMap, Queryable, QueryEngineAdapter } from './../engine/queryEngine';
@@ -16,12 +42,12 @@ const  AVariables = (props:WidgetProperties<null>, state:{argMap:{[argKey:string
     const [actionQuery, setActionQuery] = useState<Queryable|undefined>(undefined);
 
     useEffect(() => {
-        let listener = new class extends QueryEngineAdapter {
-	        argsChanged(argMap: ArgMap): void {
+        const listener = new class extends QueryEngineAdapter {
+            argsChanged(argMap: ArgMap): void {
                 setChangedArgs(Object.keys(argMap));
                 setArgMap(props.queryEngine.argMap);
             }
-            tabChanged(queryable: Queryable, qTab: SmartRs): void { }
+            tabChanged(queryable: Queryable, qTab: SmartRs, exceededMaxRows:boolean): void { }
             queryError(queryable: Queryable, exception: string): void {  setException(exception); }
 
             sendingQuery(queryable: Queryable, argMap: ArgMap): void {

@@ -1,6 +1,32 @@
-import { DataTypeMap, DataTypes, SmartRs } from "../engine/chartResultSet";
+/*******************************************************************************
+ *
+ *   $$$$$$$\            $$\                     
+ *   $$  __$$\           $$ |                     
+ *   $$ |  $$ |$$\   $$\ $$ | $$$$$$$\  $$$$$$\   
+ *   $$$$$$$  |$$ |  $$ |$$ |$$  _____|$$  __$$\  
+ *   $$  ____/ $$ |  $$ |$$ |\$$$$$$\  $$$$$$$$ |  
+ *   $$ |      $$ |  $$ |$$ | \____$$\ $$   ____|  
+ *   $$ |      \$$$$$$  |$$ |$$$$$$$  |\$$$$$$$\  
+ *   \__|       \______/ \__|\_______/  \_______|
+ *
+ *  Copyright c 2022-2023 TimeStored
+ *
+ *  Licensed under the Reciprocal Public License RPL-1.5
+ *  You may obtain a copy of the License at
+ *
+ *  https://opensource.org/license/rpl-1-5/
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ ******************************************************************************/
+ 
+import { DataTypeMap, SmartRs } from "../engine/chartResultSet";
 import { isEqual,debounce, set, get, cloneDeep, merge, omit } from 'lodash-es';
-import React, { useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { renderToString } from 'react-dom/server'
 import 'slickgrid/lib/jquery-1.8.3.js'
 import 'slickgrid/lib/jquery-ui-1.9.2.js'
@@ -18,21 +44,21 @@ import 'slickgrid/plugins/slick.cellcopymanager.js'
 import 'slickgrid/plugins/slick.cellselectionmodel.js'
 import 'slickgrid/plugins/slick.cellexternalcopymanager.js'
 import 'slickgrid/controls/slick.gridmenu.js'
+import 'slickgrid/plugins/slick.autotooltips.js'
 // import 'slickgrid/controls/slick.columnpicker.js'
 import draghandlepng from 'slickgrid/images/drag-handle.png'
 import deletepng from 'slickgrid/images/delete.png'
 import 'jquery-sparkline/jquery.sparkline.min.js';
 
-
 import _uniqueId from 'lodash-es/uniqueId';
 import { ChartWrapper, ChartWrapper90 } from "../styledComponents";
-import AGridContextMenu, { ContextMenu } from "./AGridContextMenu";
-import { Icon, Menu, MenuDivider, MenuItem } from "@blueprintjs/core";
+import AGridContextMenu from "./AGridContextMenu";
+import { Icon } from "@blueprintjs/core";
 import { ActionRunner, ColConfig, ColFormat, ColumnConfig, getEmptySubConfig, SubConfig } from "./ChartFactory";
-import SFormatters from "./SFormatters";
 import { SetArgsType } from "../engine/queryEngine";
 import { ThemeContext } from "../context";
 import { DeepPartial } from "utility-types";
+import { createAddlHeaderRow, doSparkLines, FilterMenu, FilterType, getFilterResult, getSlickFormatter } from "./AGridHelper";
 
 // Notice even though we currently only support bold/normal, we store them as same names as TextStyleFrow AND CSS. 
 // This is in case we want to support more options in future. e.g. bolder/lighter.
@@ -57,6 +83,7 @@ export const defaultGridclmConfig:GridclmConfig = { fontStyle:"normal", fontWeig
 //const a = <span style={{fontFamily:"serif"}} />
 
 export type GridConfig = {
+    showPulsePivot: boolean,
     showFilters: boolean,
     showPreheaderPanel: boolean,
     showContextMenu: boolean,
@@ -104,17 +131,17 @@ function getGridMenu(clearSortAction:()=>void) {
     //     }
     //   }
     ]};
-};
+}
   
 function comparer(a:any, b:any, sortcol:string) {
-    let va = a[sortcol];
-    let vb = b[sortcol];
+    const va = a[sortcol];
+    const vb = b[sortcol];
     if(typeof va == "number" && typeof vb == "number") {
         return va - vb;
     } else if(va instanceof Date && vb instanceof Date) {
         return va.getTime() - vb.getTime();
     }
-    var collator = new Intl.Collator(undefined, {
+    const collator = new Intl.Collator(undefined, {
       numeric: true,
       sensitivity: "base",
     });
@@ -122,77 +149,12 @@ function comparer(a:any, b:any, sortcol:string) {
   }
 
 
-function createAddlHeaderRow(grid:any, columns:Array<{columnGroup:string, width:number}>) {
-    let html = "<div class='slick-header ui-state-default slick-header-left' style='width: calc(100% - 18px)'>	<div class='slick-header-columns slick-header-columns-left ui-sortable' style='left: -1000px; width: 1796px;' unselectable='on'>	";
-    var widthDiff = grid.getHeaderColumnWidthDiff();
-    for (var i = 0; i < columns.length;) {
-        let m = columns[i];
-        let c = 1;
-        let widthTotal = m.width - widthDiff;
-        while(i+c < columns.length && m.columnGroup === columns[i+c].columnGroup) {
-            widthTotal += columns[i+c].width;
-            c++;
-        }
-        html += "<div class='ui-state-default slick-header-column' style='width: " + widthTotal + "px;'><span class='slick-column-name'>" + (m.columnGroup || '') + "</span></div>";
-        i+=c;
-    }
-    html += "</div></div>";
-    $(grid.getPreHeaderPanel()).html(html);
-}
-
-type FilterType = "Equals"|"Does Not Equal"|"Contains"|"Does Not Contain"|"Starts With"|"Ends With"|"<"|"<="|">"|">=";
-function FilterMenu(props:{x:number, y:number, selected:FilterType|undefined, selectionMade: (filterType:FilterType) => void; }) {
-    const sel = (e: React.MouseEvent,ft:FilterType) => { e.stopPropagation(); props.selectionMade(ft); };
-    const r = (f:FilterType,s:string="") => <MenuItem text={s.length>0?s:f} onClick={(e) =>{ sel(e,f); }} icon={f === props.selected ? "tick" : "blank"} />
-    return  <ContextMenu x={props.x} y={props.y}><Menu>
-        {(["Contains","Does Not Contain","Equals","Does Not Equal","Starts With","Ends With"] as FilterType[]).map(f => r(f))}
-        <MenuDivider  title="Number Filters" />
-        {r("<","Less Than")}
-        {r("<=","Less Than Or Equal To")}
-        {r(">","Greater Than")}
-        {r(">=","Greater Than Or Equal To")}
-        </Menu></ContextMenu>;   
-}
-
-/**
- * JQuery based sparklines as found at: https://omnipotent.net/jquery.sparkline/#s-about
- * Went with class based styling as wasn't sure how to render every ID.
- * Have to refresh draw them on scroll else they are not shown. Think this is due to zero-size generated initially by slickGrid.
- * Definitely are performance issues when drawing 100s.
- * Still @TODO: kdb float/short arrays? .
- * Add to H2 Demo 
- * Add to KDB Demo
- * Add Documentation
- * kdb null values?
- * kdb empty arrays.
- */
-function doSparkLines(theme:"light"|"dark") {
-    // create type to allow later calls to work without having to use ts-ignore everywhere
-    type Sp = { sparkline:(h:string, args:any)=>void};
-    const sp = (qry:string) => ($(qry) as unknown as Sp);
-    sp('.sparkbar').sparkline('html', {type: 'bar', height:'20', barColor: 'green'} );
-    sp('.sparkpie').sparkline('html', {type: 'pie', height:'21', width:'21' } ); 
-    const hw = {height:'20', width:'100'};
-    if(theme === "light") {
-        sp('.sparkline').sparkline('html', {type: 'line', ...hw } );
-        sp('.sparkdiscrete').sparkline('html', {type: 'discrete', ...hw } ); 
-        sp('.sparkbullet').sparkline('html', {type: 'bullet', ...hw } );
-        sp('.sparkboxplot').sparkline('html', {type: 'box', ...hw } );
-    } else {
-        // Line Color = $blew-c  from App.scss
-        sp('.sparkline').sparkline('html', {type: 'line', ...hw,  lineColor: '#2C92B6', fillColor: '#102040' } );
-        sp('.sparkdiscrete').sparkline('html', {type: 'discrete', ...hw,  lineColor: '#2C92B6' } );
-        sp('.sparkbullet').sparkline('html', {type: 'bullet', ...hw, rangeColors: ['#99aabb','#6677bb','#1122bb'] } );
-        sp('.sparkboxplot').sparkline('html', {type: 'box', ...hw, boxLineColor: '#dddddd', boxFillColor: '#445588', whiskerColor: '#dddddd', outlierLineColor: '#dddddd' } ); 
-    }
-}
 
 export const defaultGridConfig:GridConfig = {
-    showPreheaderPanel: false, showFilters: false, frozenRow: 0, showContextMenu: true, pager: "100", autosizeColumns: true, gridclmConfig: {} };
+    showPulsePivot:false, showPreheaderPanel: false, showFilters: false, frozenRow: 0, showContextMenu: true, pager: "100", autosizeColumns: true, gridclmConfig: {} };
 
 export type ColAlignOptions = "left"|"center"|"right";
 
-// THis is the target: https://ghiscoding.github.io/Angular-Slickgrid/#/trading
 // These were the starting point:
 //    http://6pac.github.io/SlickGrid/examples/example-grid-menu.html   - Used as start point
 //    https://github.com/6pac/SlickGrid/blob/master/examples/example15-auto-resize.html  - paused this work as didn't work with react.
@@ -218,7 +180,7 @@ export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, 
     const srs = props.srs;
     const gc:GridConfig = merge(cloneDeep(defaultGridConfig),props.subConfig.gridConfig ?? {});
     
-    const updateGrid = (forceRefresh:boolean = false) => {
+    const updateGrid = (forceRefresh = false) => {
       if(gridRef.current  && dataViewRef.current) {
   
         if(srs) {
@@ -257,13 +219,13 @@ export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, 
           // @ts-ignore
           function filter(item:any) {
             try {
-                for (var columnId in columnFilters) {
+                for (const columnId in columnFilters) {
                     const filter = columnFilters[columnId].toLowerCase();
                     const ft = columnFiltersTypes[columnId] || "Contains";
                     if (gridRef.current && columnId !== undefined && filter !== "") { // @ts-ignore
-                        var c = gridRef.current.getColumns()[gridRef.current.getColumnIndex(columnId)];
-                        let val = item[c.field];
-                        let fval = c.formatter(-1,-1,val, c, item); // special -1 to signal return formatted text but not html
+                        const c = gridRef.current.getColumns()[gridRef.current.getColumnIndex(columnId)];
+                        const val = item[c.field];
+                        const fval = c.formatter(-1,-1,val, c, item); // special -1 to signal return formatted text but not html
                         if(!getFilterResult(ft, filter, fval) && !getFilterResult(ft, filter, val)) {
                             return false;
                         }
@@ -340,7 +302,7 @@ export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, 
             const dataView = new Slick.Data.DataView();
             dataViewRef.current = dataView; // @ts-ignore
             const columns: { columnGroup: string; width: number; }[] = [];  // @ts-ignore
-            let grid = gridRef.current = new Slick.Grid('#'+id, dataView, columns, options);   // @ts-ignore
+            const grid = gridRef.current = new Slick.Grid('#'+id, dataView, columns, options);   // @ts-ignore
             grid.setSelectionModel(new Slick.CellSelectionModel());
             allColNames.current = []; // resetting these to force column redefine
             types.current = {};  // @ts-ignore
@@ -360,16 +322,16 @@ export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, 
                 $(grid.getHeaderRow()).on("click", ":input", function (e) { e.stopPropagation(); }); // Clicking filter should NOT show editor
                 $(grid.getHeaderRow()).on("change keyup", ":input", () => {
                     // Done using jQuery/DOM as the state didn't seem to hold all keys
-                    let m:{[k:string]:string} = {};
+                    const m:{[k:string]:string} = {};
                     $(grid.getHeaderRow()).find(".filterInput").get().forEach(e => {
-                        let s = (e as HTMLInputElement).value.trim();
+                        const s = (e as HTMLInputElement).value.trim();
                         if(s.length>0) { m[$(e).data("columnId")] = s }
                     });
                     setColumnFilters(m);
                 });
                 
                 $(grid.getHeaderRow()).on("click", ":button", function (e) {
-                    var columnId = $(this).data("columnId") as string;
+                    const columnId = $(this).data("columnId") as string;
                     setShowFilterMenu({visible:!showFilterMenu.visible, x:e.pageX, y:e.pageY, colName:columnId});
                     });
                 grid.onHeaderRowCellRendered.subscribe(function(e:any, args:any) {
@@ -397,23 +359,30 @@ export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, 
             
             grid.onContextMenu.subscribe(function (e:any, args:any) {
               e.preventDefault();
-              let cell = grid.getCellFromEvent(e);
-              var itm = grid.getDataItem(cell.row); // reference to specyfic row
+              const cell = grid.getCellFromEvent(e);
+              const itm = grid.getDataItem(cell.row); // reference to specyfic row
               const colDef = grid.getColumns()[cell.cell];
               if(gc.showContextMenu) { // Must be original name here as that's what is used to add formatters/align settings
                 setShowContextMenu({visible:true, x:e.pageX, y:e.pageY, colName:colDef.originalName, rowItem:itm});
               }
-            });
+            }); 
             
-            grid.onClick.subscribe(function (e:any, args:{row:number, cell:number}) {
-                var itm = grid.getDataItem(args.row); // reference to specyfic row
-                const colDef = grid.getColumns()[args.cell];
-                if(typeof itm === "object") {
-                    props.setArgTyped({ series:colDef.name, ...selectArgs(itm)}); 
-                    const ahsToRun = subConfigRef.current.actionHandlers.filter(a => a.trigger === "Click" && (a.name === "" || a.name === colDef.name));
-                    props.actionRunner(ahsToRun, itm);
+            // can't use this onClick as FlexLayout blocks the first ever click on a panel
+            // grid.onClick.subscribe(function (e:any, args:{row:number, cell:number}) {
+            
+            $('#'+id).on("mousedown", function (e) {
+                const args = grid.getCellFromEvent(e);
+                if(args && typeof args.cell == "number" && typeof args.row == "number") {
+                    grid.setActiveCell(args.row, args.cell);
+                    const itm = grid.getDataItem(args.row)
+                    const colDef = grid.getColumns()[args.cell];
+                    if(typeof itm === "object") {
+                        props.setArgTyped({ series:colDef.name, ...selectArgs(itm)}); 
+                        const ahsToRun = subConfigRef.current.actionHandlers.filter(a => a.trigger === "Click" && (a.name === "" || a.name === colDef.name));
+                        props.actionRunner(ahsToRun, itm);
+                    }
                 }
-            });
+            });       
             
             grid.onScroll.subscribe(function (e:any, args:{scrollLeft:number, scrollTop:number}) {
                 doSparkLines(context.theme); // without this, scrolling causes sparkLines NOT to display until new data arrives.
@@ -444,7 +413,8 @@ export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, 
             //     rightPadding: 0,  bottomPadding: 0, topPadding:0, leftPadding:0 //,  minHeight: 40,  minWidth: 40, maxHeight: 3000,  maxWidth: 3000
             // });
             // grid.registerPlugin(resizer);
-            let myListener = debounce(function () {  updateGrid(true);               }, 100); 
+            grid.registerPlugin(new Slick.AutoTooltips({ enableForHeaderCells: true }));
+            const myListener = debounce(function () {  updateGrid(true);               }, 100); 
             window.addEventListener('resize', myListener);
             
             grid.init();        
@@ -465,7 +435,6 @@ export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, 
       const showPager = gc.pager !== undefined && gc?.pager !== "-2";
 
     return <ChartWrapper className="grcontainer">
-        
         {showPager ?  
              <><ChartWrapper90 id={id} style={{ width:"100%" }}></ChartWrapper90><div id={pagerid} style={{height:"20px", width:"99%"}}></div></>
             :<ChartWrapper id={id} style={{ width:"100%" }}></ChartWrapper>}
@@ -491,7 +460,7 @@ export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, 
  * e.g. Could show line for current TS on chart and highlight current TS row on table to show events near the same time.
  */
 function selectArgs(argMapWithTypes: { [argKey: string]: any }):{[argKey: string]: any} {
-    let r:{[argKey: string]: any} = {};
+    const r:{[argKey: string]: any} = {};
     let s:string | null = null;
     let n:number | null = null;
     let d:Date | null = null;
@@ -523,59 +492,31 @@ function selectArgs(argMapWithTypes: { [argKey: string]: any }):{[argKey: string
 
 
 export function containsGridSDcol(colName:string) {
-    let c = colName.toLowerCase();
-    let p = c.indexOf("_sd_");
+    const c = colName.toLowerCase();
+    const p = c.indexOf("_sd_");
     if (p > 0) {
         return ['_sd_bg', '_sd_fg', '_sd_class', '_sd_code'].indexOf(c.substring(p)) !== -1;
     }
     return false;
 }
 
-function getSlickFormatter(colNameUsed:string, dataType:DataTypes, gc:GridclmConfig) {
-    // Pipeline with separate responsibilities to allow sensible nesting/cascading. 
-    // formatter(CONTENT) -> TEXT -> render(TEXT) -> HTML -> cellRender(HTML) -> SPAN
-    // [cssClass:(aligned|bold,  [ span?(class|bg/fg=, [render(tag/sparkline, [formatter(code|number|percent, CONTENT):txt] ):html] :span] ]
-
-    // Useful to separate formatting of text and rendering. As other grids support that concept.
-    // If we have both, we pipeline them ourselves.
-    const formatter = SFormatters.getFormatter(colNameUsed, dataType);
-    const renderer = SFormatters.getRenderer(colNameUsed);
-    let slickFormatter = (row:number, cell:number, value:any, columnDef:any, dataContext:any) => {
-        if(row === -1) { // special case to allow filter to access the raw text
-            return formatter(row, cell, value, columnDef, dataContext);
-        }
-        let codeFormatV = SFormatters.getCode(row, cell, value, columnDef, dataContext);
-        let v = codeFormatV ? codeFormatV : formatter(row, cell, value, columnDef, dataContext);
-        v = renderer ? renderer(row, cell, v, columnDef, dataContext) : v;
-        let s = SFormatters.getCssStyle(row, cell, value, columnDef, dataContext)
-        let c = SFormatters.getCssClass(row, cell, value, columnDef, dataContext)
-        const fg = gc.color.length > 0 ? "; color:" + gc.color : "";
-        const bg = gc.backgroundColor.length > 0 ? "; background-color:" + gc.backgroundColor : "";
-        const style = fg + bg + s;
-        // if(style.length > 0 || c.length > 0) {
-            v = "<span class='sgspan " + c + "' style='" + style + "'>" + (v === null ? '' : v) + "</span>";
-        // }
-        return v;
-      };
-      return slickFormatter;
-}
 
 export function generateColDefs(allColNames: string[], types: DataTypeMap, enableGrouping: boolean, colConfig:ColConfig, gridConfig:DeepPartial<GridConfig>) {
     // Columns that affect styling in a different column should NOT be shown
-    let colsShown = allColNames.filter(colName => !containsGridSDcol(colName));
-    let colDefs = colsShown.map((e, idx) => {
+    const colsShown = allColNames.filter(colName => !containsGridSDcol(colName));
+    const colDefs = colsShown.map((e, idx) => {
         const columnConfig:ColumnConfig = (colConfig && e in colConfig) ? colConfig[e] : {};
         const colNameUsed = columnConfig.colFormat === undefined ? e : "x_SD_" + colConfig[e].colFormat;
 
-        let p = e.toLowerCase().indexOf("_sd_");
-        let name = p === -1 ? e : e.substring(0, p);
-        let reName = get(colConfig,e+".name",name);
-        let grpP = name.indexOf("_");
-        let columnGroup = grpP === -1 ? "" : name.substring(0, grpP);
+        const p = e.toLowerCase().indexOf("_sd_");
+        const name = p === -1 ? e : e.substring(0, p);
+        const reName = get(colConfig,e+".name",name);
+        const grpP = name.indexOf("_");
+        const columnGroup = grpP === -1 ? "" : name.substring(0, grpP);
         //{id: 'duration', name: 'Duration', field: 'duration', resizable: false},
         const gc:GridclmConfig = { ...defaultGridclmConfig, ...(gridConfig && gridConfig.gridclmConfig && gridConfig.gridclmConfig[e])};
         const aligned = (gc.textAlign === "" ? (types[e] === "number" ? "gcright" : "") : ("gc" + gc.textAlign));
-        let cd:any = {
+        const cd:any = {
             name: reName !== name ? reName : (enableGrouping && columnGroup.length > 0 ? name.substring(grpP+1) : name),
             originalName:e,
             id: e,
@@ -599,48 +540,6 @@ export function generateColDefs(allColNames: string[], types: DataTypeMap, enabl
     return colDefs.map(({columnGroup, ...item}) => item);
 }
 
-
-
-
-function getFilterResult(ft: string, filter: string, val: any) {
-    let s = ""+val;
-    if (typeof val === 'string' || val instanceof String) {
-        s = val.toLowerCase();
-    } else if(typeof val === 'number') {
-        if(filter.length >= 2) {
-            if(filter.substring(0,2) === "<=") {
-                return val <= parseFloat(filter.substring(2));
-            } else if(filter.substring(0,1) === "<") {
-                return val < parseFloat(filter.substring(1));
-            } else if(filter.substring(0,1) === ">") {
-                return val > parseFloat(filter.substring(1));
-            } else if(filter.substring(0,2) === ">=") {
-                return val >= parseFloat(filter.substring(1));
-            }
-        }
-    }
-    if(ft === "Contains") {
-        return s.includes(filter);
-    } else if(ft === "Does Not Contain") {
-        return !s.includes(filter);
-    } else if(ft === "Starts With") {
-        return s.startsWith(filter);
-    } else if(ft === "Ends With") {
-        return s.endsWith(filter);
-    } else if(ft === "Equals") {
-        // eslint-disable-next-line eqeqeq
-        return s == filter;
-    } else if(ft === "Does Not Equal") {
-        // eslint-disable-next-line eqeqeq
-        return s != filter;
-    }
-    const fl = parseFloat(filter);
-    if(isNaN(fl) || typeof val !== 'number') { return false; }
-    if(ft === "<") { return val <  fl }
-    if(ft === "<="){ return val <= fl }
-    if(ft === ">") { return val >  fl }
-    if(ft === ">="){ return val >= fl }
-}
 
 // function getSmartTransaction(oldData: any[], rsdata: RsData, confirmedRowCount: number): RowDataTransaction | undefined {
 //     // Assuming something like:

@@ -1,6 +1,32 @@
+/*******************************************************************************
+ *
+ *   $$$$$$$\            $$\                     
+ *   $$  __$$\           $$ |                     
+ *   $$ |  $$ |$$\   $$\ $$ | $$$$$$$\  $$$$$$\   
+ *   $$$$$$$  |$$ |  $$ |$$ |$$  _____|$$  __$$\  
+ *   $$  ____/ $$ |  $$ |$$ |\$$$$$$\  $$$$$$$$ |  
+ *   $$ |      $$ |  $$ |$$ | \____$$\ $$   ____|  
+ *   $$ |      \$$$$$$  |$$ |$$$$$$$  |\$$$$$$$\  
+ *   \__|       \______/ \__|\_______/  \_______|
+ *
+ *  Copyright c 2022-2023 TimeStored
+ *
+ *  Licensed under the Reciprocal Public License RPL-1.5
+ *  You may obtain a copy of the License at
+ *
+ *  https://opensource.org/license/rpl-1-5/
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ ******************************************************************************/
+ 
 import React, { Component, createRef, ReactNode, RefObject, Suspense } from 'react';
 import { Action, TabNode, Layout, Model, Actions, TabSetNode, BorderNode, IJsonModel } from "flexlayout-react";
-import { Button, ButtonGroup, EditableText, H1, Icon, Intent, Menu, MenuItem, NonIdealState, Popover, Position } from "@blueprintjs/core";
+import { Button, ButtonGroup, EditableText, H1, Icon, Intent, MaybeElement, Menu, MenuItem, NonIdealState, Popover, Position } from "@blueprintjs/core";
 import Counter from './Counter';
 import AIFrame from './AIFrame';
 import { notyf, ThemeContext, topNotyf } from '../context';
@@ -14,7 +40,7 @@ import AForm from './AForm';
 import { isBorderless } from './../App';
 
 import { FlexContainer } from '../styledComponents';
-import { fetchProcessServers, ServerConfig } from './ConnectionsPage';
+import { ServerConfig, useServerConfigs } from './ConnectionsPage';
 import { Link } from 'react-router-dom';
 import AVariables from './AVariables';
 import { isAdmin } from './../context';
@@ -23,6 +49,8 @@ import '../dark.css';
 import AEditor from './AEditor';
 import html2canvas from 'html2canvas';
 import { Popover2 } from '@blueprintjs/popover2';
+import { debounce, get } from 'lodash-es';
+import { BlueprintIcons_16Id } from '@blueprintjs/icons/lib/esm/generated/16px/blueprint-icons-16';
 const AText = React.lazy(() => import('./AText'));
 
 export const DEFAULT_GLOBAL = {
@@ -55,7 +83,6 @@ interface FlexPanelState {
     displayEditor: boolean,
     model: Model | null,
     dash: Dash | null,
-    serverConfigs: ServerConfig[] | undefined,
     isNew:boolean,
 }
 interface FlexPanelProps {
@@ -64,16 +91,25 @@ interface FlexPanelProps {
 
 type WidgetType = "iframe"|"aeditor"|"atext"|"variables"|"aform"|ChartType;
 
+
+export default function FlexPanel(props:FlexPanelProps) {
+    const [serverConfigs] = useServerConfigs();
+            
+    return serverConfigs.length === 0 ?
+            <NonIdealState icon="error" title="No Connections found" 
+                action={<div>Try  <Link to="/connections"><Button intent="primary">Adding Connections</Button></Link></div>} />
+                : <InnerFlexPanel serverConfigs={serverConfigs} {...props} />;
+}
+
 /**
  * Note either a dashId alone is specified OR dashId+version, if a verison is specified it meants
  * that the user wants to READ-ONLY see an old verison, hence why !editPermitted. They could choose to restore it elsewhere.
  */
-export default class FlexPanel extends Component<FlexPanelProps,FlexPanelState> {
+class InnerFlexPanel extends Component<FlexPanelProps & {serverConfigs:ServerConfig[]},FlexPanelState> {
     state: FlexPanelState = {
         displayEditor: false,
         model: null,
         dash: null,
-        serverConfigs: undefined,
         isNew: false,
     } 
     static contextType = ThemeContext;
@@ -91,7 +127,7 @@ export default class FlexPanel extends Component<FlexPanelProps,FlexPanelState> 
             alert("You must enter a valid name");
         } else {
             if(this.state.dash) {
-                let dash = {...this.state.dash,name:newName};
+                const dash = {...this.state.dash,name:newName};
                 this.setState({dash});
             }
         }
@@ -101,7 +137,7 @@ export default class FlexPanel extends Component<FlexPanelProps,FlexPanelState> 
         let model = undefined;
         const v = typeof version === 'number' ? version : -1; // careful as version can be 0
         try {
-            let dash = await getDash(id, v);
+            const dash = await getDash(id, v);
             let isNew = false;
             if (dash.data) {
                 model = Model.fromJson(dash.data);
@@ -117,7 +153,7 @@ export default class FlexPanel extends Component<FlexPanelProps,FlexPanelState> 
             document.title = dash.name + (v >= 0  ? " version:" + v : "");
         } catch(err:any) {
             if(err instanceof AxiosError && err.response) {
-                let msg = err.response.status === 404 ? "Dashboard not found." : "Unrecognised Error";
+                const msg = err.response.status === 404 ? "Dashboard not found." : "Unrecognised Error";
                 this.props.setTitle(<H1>{msg}</H1>);
                 notyf.error("Could not open dashboard." + msg)
                 console.error("Error response:");
@@ -128,28 +164,26 @@ export default class FlexPanel extends Component<FlexPanelProps,FlexPanelState> 
         }
     };
 
-    constructor(props:FlexPanelProps) {
-    	super(props);
+    constructor(props:FlexPanelProps & {serverConfigs:ServerConfig[]}) {
+        super(props);
         this.layoutRef= React.createRef();
     }
 
     componentDidMount() {
         this.loadDashAndServers(this.props.dashId, this.props.versionId);
-        fetchProcessServers((s) => this.setState({serverConfigs:s}));
     }
 
     factory(node:TabNode) {
-        var component = node.getComponent() ?? "";
+        const component = node.getComponent() ?? "";
         const selected = this.isEditPermitted() && this.state.displayEditor && node.getId() === this.state.model?.getActiveTabset()?.getSelectedNode()?.getId();
         const clearSelected = () => this.setState({displayEditor:false});
-        let setConfigSaver = (callback:() => any) => {
+        const setConfigSaver = (callback:() => any) => {
             node.setEventListener("save", (p:any) => {
                 node.getConfig().dashstate = callback();
             });
         }
         // See renderer, serverConfigs is ALWAYS defined by now else widgets would never receive updated list.
-        let serverConfigs = this.state.serverConfigs ? this.state.serverConfigs : [];
-        const widgetProps = {queryEngine:this.props.queryEngine, serverConfigs, 
+        const widgetProps = {queryEngine:this.props.queryEngine, serverConfigs:this.props.serverConfigs, 
                 clearSelected, selected, setConfigSaver, savedState:node.getConfig()?.dashstate };
 
         let r = <div></div>;
@@ -169,15 +203,24 @@ export default class FlexPanel extends Component<FlexPanelProps,FlexPanelState> 
             const chartType = component as ChartType;
             r = <MyUpdatingChart {...widgetProps} chartType={chartType} tabNode={node} />;
         }
-        return <span onClick={() => { this.setState({displayEditor:true}); this.state.model?.doAction(Actions.selectTab(node.getId())) }} 
-                        id={"widget-"+node.getId().replaceAll("#","")} className={"widget widget-"+node.getName()}>{r}</span>;
+        return <span 
+                /**  
+                   See: https://github.com/caplin/FlexLayout/issues/303 
+                        https://github.com/timestored/pulse-client/issues/91 
+                   Beforce changing this, particularly to onCLick as it's tricky.
+                */
+                onMouseDown={(e)=>{ 
+                    this.setState({displayEditor:true}); 
+                    this.state.model?.doAction(Actions.selectTab(node.getId()));
+                }} 
+                id={"widget-"+node.getId().replaceAll("#","")} className={"widget widget-"+node.getName()}>{r}</span>;
     }
 
     handleAddWidget = (name: WidgetType) => {
         console.log('trying to add tab');
-        var jsonChild = { component: name, name: name, config: {} };
-        let a:TabNode[] = [];
-        let m = this.state?.model;
+        const jsonChild = { component: name, name: name, config: {} };
+        const a:TabNode[] = [];
+        const m = this.state?.model;
         this.setState({isNew:false});
         if(m != null) {
             m.visitNodes((nd) => { if(nd.getType()==="tab") { a.push(nd as TabNode); } })
@@ -188,7 +231,7 @@ export default class FlexPanel extends Component<FlexPanelProps,FlexPanelState> 
                 this.layoutRef.current!.addTabToActiveTabSet(jsonChild);
             } else {
                 this.layoutRef.current!.addTabWithDragAndDrop("Click to position this panel<br>to your desired location", jsonChild);
-                topNotyf('Click to drop the panel in that location.');
+                topNotyf('Move the mouse<br /> to drop the panel in that location.');
             }
         }
     }
@@ -197,7 +240,6 @@ export default class FlexPanel extends Component<FlexPanelProps,FlexPanelState> 
     render() {
         const { model } = this.state;
         model?.doAction(Actions.updateModelAttributes({ tabEnableClose:this.isEditPermitted() }));
-        let sc = this.state.serverConfigs;
         let tabCount = 0;
         model?.visitNodes(n => tabCount += (n.getType()==="tab" ? 1 : 0));
         const isNewOrEmpty = tabCount === 0 || this.state.isNew;
@@ -208,12 +250,8 @@ export default class FlexPanel extends Component<FlexPanelProps,FlexPanelState> 
         return (
             <div className={"FlexPanel dashname-"+this.state.dash?.name.replaceAll(" ","-")} id={"dashid-"+this.props.dashId}>
             {this.isEditPermitted() && <TopMenu addWidget={this.handleAddWidget} saveDashboard={this.saveDashboard} highlightAddButtons={isNewOrEmpty}  />}
-            
-            {sc?.length === 0 && 
-                    <NonIdealState icon="error" title="No Connections found" 
-                        action={<div>Try  <Link to="/connections"><Button intent="primary">Adding Connections</Button></Link></div>} />}
 
-            {(sc && sc.length > 0) && 
+            {(this.props.serverConfigs.length > 0) && 
             <FlexContainer topMargin={topMargin} rightMargin={rightMargin} id="dashScreenshotContainer" >
                 {model && <Layout ref={this.layoutRef} model={model} factory={this.factory.bind(this)}
                                 onAction={this.handleAction}  
@@ -247,11 +285,11 @@ export default class FlexPanel extends Component<FlexPanelProps,FlexPanelState> 
             const id = 'tab_settings_popover_' + tabSetNode.getId();
             renderValues.buttons.push(<button className="dupeicon" key={id} onClick={() => { 
                 this.state.model!.toJson(); // fake save, to force models to put state into JSON
-                let n = this.state.model?.getNodeById(tabSetNode.getId());
+                const n = this.state.model?.getNodeById(tabSetNode.getId());
                 if(n) {
-                    let tn = n.getChildren()[0] as TabNode;
+                    const tn = n.getChildren()[0] as TabNode;
                     if(tn) {
-                        var jsonChild = { component: tn.getComponent(), name: tn.getName() + " copy", config:tn.getConfig() };
+                        const jsonChild = { component: tn.getComponent(), name: tn.getName() + " copy", config:tn.getConfig() };
                         this.layoutRef.current!.addTabWithDragAndDrop("Click to position this panel<br>to your desired location", jsonChild);
                     }
                 }
@@ -265,7 +303,7 @@ export default class FlexPanel extends Component<FlexPanelProps,FlexPanelState> 
             const url = window.location.href;
             const p = url.indexOf("?");
             const params = p !== -1 ? url.substring(p) : "";
-            let d: Dash = { ...this.state.dash, ...{ data: this.state.model!.toJson(), defaultParams:params } };
+            const d: Dash = { ...this.state.dash, ...{ data: this.state.model!.toJson(), defaultParams:params } };
             
             saveDash(d).then(r => {
                 if(typeof r.data.data === 'string') {
@@ -276,24 +314,28 @@ export default class FlexPanel extends Component<FlexPanelProps,FlexPanelState> 
                 }
                 notyf.success("Saved successfully.");
                 if(this.state.dash !== null) {
-                    let dash = {...this.state.dash,version:this.state.dash.version+1};
+                    const dash = {...this.state.dash,version:this.state.dash.version+1};
                     this.setState({dash})
                 }
             }).catch((e) => {
-                console.error(e);
-                notyf.error("Save Failed.");
+                if(get(e,"response.status",0) === 405) {
+                    notyf.error("Save Failed as your dashboard is out of sync. Someone else may have made modifications.");
+                } else {
+                    console.error("Save failed", e);
+                    notyf.error("Save Failed.");
+                }
             });
 
             // After saving the critical data. Try to get a screenshot for the thumbnail.
-            let el = document.getElementById("dashScreenshotContainer") || document.body;
+            const el = document.getElementById("dashScreenshotContainer") || document.body;
             el.style.width = (16*(el.clientHeight/9.0)) + "px"; // Setting width and height messed up the layout
-            let footEl = document.getElementById("dashfooter");
+            const footEl = document.getElementById("dashfooter");
             let origDisplay:string|null = null;
             if(footEl) {
                 origDisplay = footEl.style.zIndex;
                 footEl.style.zIndex = '-2000';
             }
-            delay(500).then(() => {  notyf.success({type:"info", message:"Taking screenshot"});})
+            delay(500).then(() => {  notyf.success({type:"info", message:"Saving thumbnail"});})
             delay(1500).then(() => { // Delay needed to let layout "adjust"
                 // Without background, the screenshot had left/right edges.
                 html2canvas(el, {scale:0.5, backgroundColor:this.context.theme === "dark" ? "#444" : "#CCC"}).then((canvas) => { 
@@ -341,9 +383,22 @@ function TopMenu(props:TopMenuProps) {
     }
 
     const s = true;
+
+    // Using debounce onMouseDown and onCLick to allow either clicking the button OR dragging the button to place a component.
+    // Debounce needed to prevent 2 popups and to make it work. Without it activates the drag but click happened so nothing drops.
+    // @TODO There is one bug where expanding "More Charts" and dragging, leaves the expanded menu still open.
+    const MILLIS = 200;
     const cts:ChartType[] = ["bar", "stack", "bar_horizontal", "stack_horizontal", "line", "area", "pie"];
-    const makeBut = (c:ChartType, txt:string|null = null, intent?:Intent) => <Button  key={c} small={true} onClick={() => addWidget(c)} icon={getChartIcon(c)} intent={intent}>{txt}</Button>;
-    const makeMenu = (c:ChartType, txt:string) => <MenuItem onClick={() => addWidget(c)} key={c} icon={getChartIcon(c)} text={txt}></MenuItem>;
+    const makeBut = (c:ChartType, txt:string|null = null, intent?:Intent) => {
+        const addCt = debounce(() => addWidget(c),MILLIS);
+        return <Button  key={c} small={true} onMouseDown={addCt} onClick={()=>addCt.flush()} icon={getChartIcon(c)} intent={intent}>{txt}</Button>};
+    const makeMenu = (icon:BlueprintIcons_16Id | MaybeElement, txt:string, f:()=>void) => {
+        const addCt = debounce(f,MILLIS);
+        return <MenuItem onMouseDown={addCt} onClick={()=>addCt.flush()} key={txt} icon={icon} text={txt}></MenuItem> };
+    const makeCMenu = (c:ChartType, txt:string) => makeMenu(getChartIcon(c), txt, () => addWidget(c));
+    const addForm = debounce(() => addWidget("aform"),MILLIS);
+    const addDebug = debounce(() => addWidget("variables"),MILLIS);
+
     return <div className="TopMenu">
         <ButtonGroup onMouseEnter={()=>{}}  >
             <div  key={"c"} style={{textAlign:"center", verticalAlign:"middle", height:"30px", lineHeight:"30px"}}>Add Component:</div>
@@ -351,37 +406,37 @@ function TopMenu(props:TopMenuProps) {
             {makeBut("timeseries","Time Series", highlightAddButtons ? "success" : "none")}
             {cts.map(c => makeBut(c))}
             <Popover content={<Menu>
-                    {makeMenu("bubble","Bubble")}
-                    {makeMenu("radar","Radar")}
-                    {makeMenu("candle","Candlestick")}
-                    {makeMenu("calendar","Calendar")}
-                    {makeMenu("boxplot","Boxplot")}
-                    {makeMenu("sunburst","Sunburst")}
-                    {makeMenu("tree","Tree")}
-                    {makeMenu("3dsurface","Surface")}
-                    {makeMenu("3dbar","3D Bar Chart")}
-                    {makeMenu("metrics","Metrics Panels")}
+                    {makeCMenu("bubble","Bubble")}
+                    {makeCMenu("radar","Radar")}
+                    {makeCMenu("candle","Candlestick")}
+                    {makeCMenu("calendar","Calendar")}
+                    {makeCMenu("boxplot","Boxplot")}
+                    {makeCMenu("sunburst","Sunburst")}
+                    {makeCMenu("tree","Tree")}
+                    {makeCMenu("3dsurface","Surface")}
+                    {makeCMenu("3dbar","3D Bar Chart")}
+                    {makeCMenu("metrics","Metrics Panels")}
                 </Menu>
                 }  position={Position.BOTTOM} minimal>
                 <Button icon="series-add" key="other" rightIcon="caret-down" >More Charts</Button>
             </Popover>
 
             <Popover content={<Menu>
-                    <MenuItem key="iframe"  onClick={() => addWidget("iframe")} icon="globe" text="Website" />
-                    <MenuItem key="aeditor" onClick={() => addWidget("aeditor")} icon="annotation" text="Editor" />
-                    <MenuItem key="atext"   onClick={() => addWidget("atext")} icon={<DiWebplatform />} text="HTML" />
-                    
-                    <MenuItem key="variables"  onClick={() => addWidget("variables")} icon={<VscSymbolVariable />} text="Debug" />
+                    {makeMenu("globe", "Website",() => addWidget("iframe"))}
+                    {/* {makeMenu("annotation", "Editor",() => addWidget("aeditor"))} */}
+                    {makeMenu(<DiWebplatform />, "HTML",() => addWidget("atext"))}
+                    {/* {makeMenu(<VscSymbolVariable />, "Debug",() => addWidget("variables"))} */}
                 </Menu>
                 }  position={Position.BOTTOM} minimal>
                 <Button key="other" rightIcon="caret-down" >Other</Button>
             </Popover>
 
-            <Button small={s} icon="form" key="aform" onClick={() => addWidget("aform")}>User Form</Button>
-            
+            <Button small={s} icon="form" key="aform" onClick={()=>addForm.flush()} onMouseDown={addForm}>User Form</Button>
+            <Button small={s} icon={<VscSymbolVariable />} key="variables" onClick={()=>addDebug.flush()} onMouseDown={addDebug}>Debug</Button>
             
             <Button small={s} key="save"  icon="floppy-disk" onClick={() => { props.saveDashboard();}} style={{marginLeft:"60px"}} intent="primary">Save</Button>
         </ButtonGroup>
     </div>;
+    
 }
 

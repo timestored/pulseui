@@ -1,10 +1,9 @@
 import styled from 'styled-components';
-import { isBorderless } from './../App';
 
 const FlexContainer = styled.div`
     position: relative;
-    width: ${props => props.isSelected ? 'calc(100vw - 600px)' : 'calc(100vw - ' + (isBorderless() ? '0px' : '10px') + ')'};
-    height: ${'calc(100vh - 80px)'};
+    width: ${props => 'calc(100vw - ' + ("rightMargin" in props ? props.rightMargin : '0px') + ')'};
+    height: ${props => 'calc(100vh - ' + ("topMargin" in props ? props.topMargin : '35px') + ')'};
 `;
 
 // const ChartWrapper = styled.div`
