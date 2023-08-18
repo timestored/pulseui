@@ -83,7 +83,7 @@ public class Application  {
 
 	/** Careful this controls the folder where libs/jars are stored **/
 	public static final String APPNAME = "pulse"; 
-	public static final String VERSION = "1.37";
+	public static final String VERSION = "1.50";
 	public static final String DBNAME = "DEMODB";
 	public static final String PASSWORD = "jimmy1";
     // Declaring ANSI_RESET so that we can reset the color
