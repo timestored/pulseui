@@ -1,0 +1,86 @@
+micronaut:
+  application:
+    name: pulse
+  server:
+    port: ${SERVER_PORT:8080}
+    cors:
+      enabled: true
+      configurations:
+        dev:
+          exposedHeaders:
+            - Content-Type
+            - Authorization
+            - Location
+    idle-timeout: 600m
+    read-idle-timeout: 600m
+    write-idle-timeout: 600m
+    max-request-size: '100MB'
+    multipart:
+      max-file-size: '100MB'
+    netty:
+      max-initial-line-length: 65536
+      max-header-size: 65536
+      max-chunk-size: 65536
+  router:
+    static-resources:
+      default:
+        enabled: true   
+        mapping: /**
+        paths: "classpath:public" 
+  logging:
+    level:
+      ROOT: ERROR
+
+  io:
+    watch:
+      paths: src/main
+      restart: true
+# https://guides.micronaut.io/latest/micronaut-security-jwt-gradle-java.html
+  security:
+    enabled: true
+    authentication: bearer 
+    rejectNotFound: false # Essential to allow SPA to work. So that 404 in java still searches in react
+    token:
+      jwt:
+        signatures:
+          secret:
+            generator:
+              secret: '"${JWT_GENERATOR_SIGNATURE_SECRET:ChangeMeForNoobEntryChangeMeForNoobEntry}"' 
+        generator:              
+          access-token:
+            expiration: 604800 # 60*60*24*7
+datasources:
+  default:
+# For dev, it's best to do in memory and use schema-generate to generate a new schema for any hibernate changes as it allows moving quickly.
+# For prod, flyway with SQL scripts to transition between steps seems safest.
+# There doesn't seem to be an automated way to do both. :S 
+    url: ${DB_URL:`jdbc:h2:file:./pulsedb`}
+#    url: jdbc:h2:mem:dashdb;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE
+    driverClassName: org.h2.Driver
+    username: sa
+    password: ''
+#    schema-generate: CREATE
+    dialect: H2
+netty:
+  default:
+    allocator:
+      max-order: 3
+jpa:
+  default:
+    entity-scan:
+        packages: 'com.sqldashboards.webby.db,com.sqldashboards.webby'
+    properties:
+      hibernate:
+        bytecode:
+          provider: none
+        hbm2ddl:
+          auto: update 
+        show_sql: true          
+flyway:
+  datasources: 
+    default: 
+      enabled: true
+jackson:
+  serialization-inclusion: non_null
+    
+micronaut.http.client.read-timeout: 5m

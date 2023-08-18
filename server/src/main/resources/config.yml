@@ -1,0 +1,27 @@
+
+# SERVER_PORT - Can ONLY be currently configured using an environment variable NOT in this file.
+
+# Turn off for anything but demoing.
+demo: ${DEMO:-"true"}
+demo_rundb: ${DEMO_RUNDB:-"true"}
+
+# Used for reverse proxying from a subdirectory.
+root_url: ${ROOT_URL}
+
+### Authorization
+
+# Authorization using REST HTTPs
+master_api_key: ${MASTER_API_KEY}
+auth_url: ${AUTH_URL}
+role_url: ${ROLE_URL}
+
+license_text: ${LICENSE_TEXT}
+
+
+# Auth Proxy - e.g. Apache/Mellon
+# Whether to assume proxy has authenticated and is passing valid details. 
+auth_proxy_enabled: ${AUTH_PROXY_ENABLED:-"false"}
+# The HTTP header containing the username
+username_header_name: ${USERNAME_HEADER_NAME:-"X-WEBAUTH-USER"}
+# IF the user is not already created within Pulse, should we create them.
+auto_sign_up: ${AUTO_SIGN_UP:-"true"}

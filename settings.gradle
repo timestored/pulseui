@@ -1,0 +1,6 @@
+
+rootProject.name="sqldash"
+
+include "client"
+include "server"
+include "cryptofeed"
