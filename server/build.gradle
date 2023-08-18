@@ -1,0 +1,88 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+}
+
+plugins {
+    id("com.github.johnrengelman.shadow") version "7.1.2"
+    id("io.micronaut.application") version "3.4.1"
+}
+
+version = "1.37"
+group = "com.sqldashboards.webby"
+
+repositories {
+    mavenCentral()
+}
+
+
+dependencies {
+    annotationProcessor("org.projectlombok:lombok")
+    annotationProcessor("io.micronaut.data:micronaut-data-processor")
+    annotationProcessor("io.micronaut:micronaut-http-validation")
+    implementation("io.micronaut:micronaut-http-client")
+    implementation("io.micronaut:micronaut-jackson-databind")
+    implementation("io.micronaut.data:micronaut-data-jdbc")
+    implementation("io.micronaut.sql:micronaut-jdbc-hikari")
+	
+    
+	annotationProcessor("io.micronaut.security:micronaut-security")
+	annotationProcessor("io.micronaut.security:micronaut-security-annotations")
+	implementation('io.projectreactor:reactor-core:3.4.19')
+	implementation("io.micronaut.security:micronaut-security-jwt")
+
+    compileOnly("org.projectlombok:lombok")
+    implementation("ch.qos.logback:logback-classic:1.3.1")
+	implementation("org.slf4j:slf4j-simple:1.7.36")    
+    
+    runtimeOnly("com.h2database:h2")
+    implementation("io.micronaut:micronaut-validation")
+	
+	
+	implementation files('lib/postgresql-42.5.0.jar')
+	implementation files('lib/mysql-connector-j-8.0.31.jar')
+	implementation files('lib/mssql-jdbc-11.2.0.jre8.jar')
+	implementation files('lib/redis-jdbc-driver-1.4.jar')
+	
+	implementation files('lib/jqi-0.0.1-SNAPSHOT-all.jar')
+	
+	implementation("jakarta.persistence:jakarta.persistence-api:2.2.3")
+	implementation("io.micronaut.flyway:micronaut-flyway")
+	implementation("org.fusesource.jansi:jansi:2.4.0")
+
+	
+	implementation("org.hibernate:hibernate-envers:5.6.9.Final")
+  
+	implementation("com.h2database:h2:1.4.200")
+	implementation('org.apache.commons:commons-dbcp2:2.9.0')
+	implementation('org.apache.commons:commons-pool2:2.11.0')
+	implementation('commons-dbutils:commons-dbutils:1.7')
+	implementation('uk.org.webcompere:lightweight-config:1.2.0')
+	
+	
+}
+
+
+application {
+    mainClass.set("com.sqldashboards.webby.Application")
+}
+java {
+    sourceCompatibility = JavaVersion.toVersion("1.8")
+    targetCompatibility = JavaVersion.toVersion("1.8")
+}
+
+graalvmNative.toolchainDetection = false
+micronaut {
+    runtime("netty")
+    testRuntime("junit5")
+    processing {
+        incremental(true)
+        annotations("com.sqldashboards.webby.*")
+    }
+}
+
+shadowJar {
+    archiveFileName = "pulse.jar"
+}
+

@@ -1,0 +1,27 @@
+/**
+body #root { font-family: Monaco; }
+
+#root .Appdark .topNavBar { 
+	background-color: #ee4444; 
+}
+
+#root .Appdark .site-footer {
+  background-color: #473E38;
+}
+#root .site-footer a { color:white; }
+#root .site-footer {
+  background: #A7431D;
+  color:white;
+}
+
+#root .Appdark {
+  background-color: #423729;
+}
+
+#root .logoImg { background-image: url(/img/mssql-logo.png); width:134px; height:55px; background-position: bottom;  }
+#root .Appdark .logoImg { background-image: url(/img/mssql-logo.png); }
+#root .dashboardPage .logoImg { width:94px; height:46px; }
+@media (max-width: 550px) {
+  #root .topNavBar .logoImg { width:80px; height:42px; }
+}
+**/

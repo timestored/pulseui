@@ -1,0 +1,6 @@
+applicationType: default
+defaultPackage: com.sqldashboards.webby
+testFramework: junit
+sourceLanguage: java
+buildTool: gradle
+features: [app-name, awaitility, data, data-jdbc, gradle, h2, hamcrest, http-client, jackson-databind, java, java-application, jdbc-hikari, junit, logback, lombok, micronaut-build, netty-server, readme, shade, yaml]
