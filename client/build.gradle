@@ -1,0 +1,18 @@
+plugins {
+  id "com.github.node-gradle.node" version "3.5.0"
+  id "base"
+}
+
+
+node {
+  version = '18.12.1'
+  npmVersion = '8.19.2'
+  yarnVersion = '1.22.10'
+  download = true
+}
+
+npmInstall {
+  args = ['--legacy-peer-deps']
+}
+
+build.dependsOn(npm_run_build)
