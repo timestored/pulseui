@@ -28,7 +28,7 @@ import { useContext, useEffect, useRef } from 'react';
 import {keymap, highlightSpecialChars, drawSelection, highlightActiveLine, dropCursor,
     rectangularSelection, crosshairCursor, EditorView, KeyBinding,
     lineNumbers, highlightActiveLineGutter} from "@codemirror/view"
-import { EditorState, Extension } from "@codemirror/state";
+import { EditorSelection, EditorState, Extension, SelectionRange } from "@codemirror/state";
 import {defaultHighlightStyle, syntaxHighlighting, indentOnInput, bracketMatching,foldGutter, foldKeymap} from "@codemirror/language"
 import {defaultKeymap, history, historyKeymap} from "@codemirror/commands"
 import {searchKeymap, highlightSelectionMatches} from "@codemirror/search"
@@ -55,39 +55,49 @@ export type EditorProps = {
 	runLine: (line: string) => void, 
 	runSelection: (selection: string) => void,
     onChange:(txt:string) => void,
+	onSelectionChange?:(line:string, selectedTxt:string) => void,
 	className?:string,
 };
 
 
 export const SqlEditor      = (props:EditorProps ) => { return MyEditor({lang:sql(QSQLConfig), ...props}); }
 
+function getLineAndSelection(v:EditorView):[string,string] {
+	const m = v.state.selection.main;
+	const selection = m['from']<m['to'] ? v.state.doc.sliceString(m['from'],m['to']) : v.state.doc.sliceString(0);
+	const line = v.state.doc.lineAt(m.head).text;
+	return [line,selection];
+}
+
 export const MyEditor = (props:Partial<EditorProps> & {lang:LanguageSupport} ) => {
 	const editor = useRef<HTMLDivElement>(null);
 	const { value } = props;
     const context = useContext(ThemeContext);
 	const runLineRef = useRef(props.runLine  ?? ((s:string)=>{}));
-	const onChangeRef = useRef(props.onChange  ?? ((s:string)=>{}));
+	const onChangeRef = useRef(props.onChange  ?? ((allTxt:string)=>{}));
+	const onSelectionChangeRef = useRef(props.onSelectionChange  ?? ((line:string, selectedTxt:string)=>{}));
 	const runSelectionRef = useRef(props.runSelection ?? ((s:string)=>{}));
 
 	// We don't want to keep redefining codemirror BUT we do want to call latest callback with new server etc.
 	runLineRef.current = props.runLine  ?? ((s:string)=>{});
 	runSelectionRef.current = props.runSelection ?? ((s:string)=>{});
-	onChangeRef.current = props.onChange ?? ((s:string)=>{});
+	onChangeRef.current = props.onChange ?? ((line:string)=>{});
+	onSelectionChangeRef.current = props.onSelectionChange ?? (((line:string, selectedTxt:string) => {}));
 
 	useEffect(() => {
 		const myKeyMap:KeyBinding[] = [{key:"Ctrl-s",   run:() => { runSelectionRef.current("s"); return true; }, preventDefault:true },
 								{key:"Ctrl-e",  preventDefault:true,
 									run:(v: EditorView) => { 
-											const m = v.state.selection.main;
-											const txt = m['from']<m['to'] ? v.state.doc.sliceString(m['from'],m['to']) : v.state.doc.sliceString(0);
-											runSelectionRef.current(txt); 
+											runSelectionRef.current(getLineAndSelection(v)[1]); 
 											return true; 
 									}},
-								{key:"Ctrl-Enter",run:(v: EditorView) => { runLineRef.current(v.state.doc.lineAt(v.state.selection.main.head).text); return true; }, preventDefault:true, mac:"Cmd-Enter", win:"Ctrl-Enter" }];
+								{key:"Ctrl-Enter",run:(v: EditorView) => { runLineRef.current(getLineAndSelection(v)[0]); return true; }, preventDefault:true, mac:"Cmd-Enter", win:"Ctrl-Enter" }];
 									
 		
-								const updateListenerExtension = EditorView.updateListener.of((update) => {
-			if (update.docChanged) { onChangeRef && onChangeRef.current(view.state.doc.toString()); } 
+			const updateListenerExtension = EditorView.updateListener.of((update) => {
+				if (update.docChanged) { onChangeRef && onChangeRef.current(view.state.doc.toString()); } 
+				const [line,selection] = getLineAndSelection(view);
+				onSelectionChangeRef && onSelectionChangeRef.current(line, selection);
 		});
 		const extensions = [props.lang,
 						keymap.of(myKeyMap),

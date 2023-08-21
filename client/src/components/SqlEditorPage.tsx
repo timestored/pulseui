@@ -50,6 +50,7 @@ import { SqlEditor } from './SqlEditor';
 import { useCacheThenUpdate } from './hooks';
 import { getH2DemoQueryable } from '../pro/ChartHelp';
 import { copyToClipboard } from './AGridContextMenu';
+import { EditorSelection, SelectionRange } from '@codemirror/state';
 
 
 export default function SqlEditorPage() {
@@ -187,6 +188,7 @@ function ServerTree(props:{queryEngine:QueryEngine, serverConfigs:ServerConfig[]
 
 function CodeEditor(props:{queryEngine:QueryEngine, serverConfigs:ServerConfig[], selectedSC:ServerConfig, setSelectedSC:(sc:ServerConfig)=>void}) {
     const [queryable, setQueryable] = useState<Queryable>();
+    const [editorSelection, setEditorSelection] = useState<{line:string,selection:string}>({line:"",selection:""});
     const [exception, setException] = useState<string | undefined>("");
     const [lastQuerySent, setLastQuerySent] = useState<string>("");
     const { serverConfigs, selectedSC } = props;
@@ -245,6 +247,14 @@ function CodeEditor(props:{queryEngine:QueryEngine, serverConfigs:ServerConfig[]
             copyToClipboard(newUrl); 
             notyf.success("Shareable URL has been copied to your clipboard"); 
         }} >Share Latest Result</Button>
+        
+        <Button small intent="primary" rightIcon="arrow-right" disabled={queryable === undefined} title="Keyboard Shortcut: Control + E"
+                onClick={() => { queryable && sendQuery(queryable); }} >Run All</Button>
+        <Button small intent="primary" rightIcon="text-highlight" disabled={queryable === undefined} title="Keyboard Shortcut: Control + E"
+                        onClick={() => { queryable && sendQuery({...queryable, query:editorSelection.selection}); }} >Run Selected</Button>                
+        <Button small intent="primary" rightIcon="key-enter" disabled={queryable === undefined} title="Keyboard Shortcut: Control + Enter"
+                        onClick={() => { queryable && sendQuery({...queryable, query:editorSelection.line});}} >Run Line</Button>                
+
     </>;
 
     return <div>
@@ -268,7 +278,8 @@ function CodeEditor(props:{queryEngine:QueryEngine, serverConfigs:ServerConfig[]
                     {rightChildren}
                 </div>
                 <SqlEditor runLine={t => sendQuery({...queryable, query:t})}  runSelection={t => sendQuery({...queryable, query:t})} 
-                            value={queryable.query}  onChange={t => setQueryable({...queryable, query:t})} />
+                            value={queryable.query}  onChange={(t) => setQueryable({...queryable, query:t})} 
+                            onSelectionChange={(line,selection) => { setEditorSelection({line,selection}); }} />
             </div>}
         
         </div>
