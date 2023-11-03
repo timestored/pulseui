@@ -11,6 +11,7 @@
 .zu-cassandra { width: 64px; height: 64px; background: url(../public/img/db.png) -64px -64px;} 
 .zu-clickhouse { width: 64px; height: 64px; background: url(../public/img/db.png) -128px -0;} 
 .zu-clickhouse_com { width: 64px; height: 64px; background: url(../public/img/db.png) -128px -64px;} 
+.zu-proton { width: 64px; height: 64px; background: url(../public/img/db.png) -128px -64px;} 
 .zu-cockroach { width: 64px; height: 64px; background: url(../public/img/db.png) -0 -128px;} 
 .zu-cratedb { width: 64px; height: 64px; background: url(../public/img/db.png) -64px -128px;} 
 .zu-csvjdbc { width: 64px; height: 64px; background: url(../public/img/db.png) -128px -128px;} 
