@@ -428,7 +428,7 @@ class jdbcConnection extends Enumify {
     static TDENGINE = new jdbcConnection("TDENGINE", "TDengine", "jdbc:TAOS-RS://{host}:{port}/[{database}]", 6041);
     static TERADATA = new jdbcConnection("TERADATA", "Teradata", "jdbc:teradata://{host}/DATABASE={database},DBS_PORT={port}", 1025);
     static TRINO = new jdbcConnection("TRINO", "Trino", "jdbc:trino://{host}:{port}[/{database}]", 8080);
-    static PROTON = new jdbcConnection("PROTON", "Timeplus Proton", "jdbc:ch://{host}:{port}/{database}", 3218);
+    static PROTON = new jdbcConnection("PROTON", "Timeplus Proton", "jdbc:proton://{host}:{port}/{database}", 8123);
 
     static _ = jdbcConnection.closeEnum();
 

@@ -72,7 +72,7 @@ public enum JdbcTypes {
 
 	POSTGRES("Postgres", "org.postgresql.Driver", 5432, "jdbc:postgresql://{host}:{port}/{database}?", "http://postgresql.com", "", ""),
 	CLICKHOUSE("Clickhouse", "ru.yandex.clickhouse.ClickHouseDriver", 8123, "jdbc:clickhouse://{host}:{port}/{database}", "http://clickhouse.com", "", ""),
-	PROTON("Proton", "com.timeplus.proton.jdbc.ProtonDriver", 3218, "jdbc:ch://{host}:{port}/{database}", "http://github.com/timeplus-io/proton", "", ""),	
+	PROTON("Proton", "com.timeplus.proton.jdbc.ProtonDriver", 8123, "jdbc:proton://{host}:{port}/{database}", "http://github.com/timeplus-io/proton", "", ""),	
 	
 	CUSTOM(getProperty("jdbc.niceName","Custom JDBC Driver"), getProperty("jdbc.driver","DriverNotSpecified"), getProperty("jdbc.port",5000), getProperty("jdbc.dbRequired", getProperty("jdbc.urlFormat","DriverUrlPrefixNotSpecified"))) {
 
