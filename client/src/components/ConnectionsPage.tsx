@@ -334,7 +334,7 @@ class ConnectionsEditor extends Component<EditorProps, ConnectionsEditorState> {
 
 export function JdbcSelect(props: { jdbcTypeSelected?: string, onChange: (e: React.FormEvent<HTMLSelectElement>) => void }) {
     // THis line was mostly generated in java (see JdbcTypesTest) then reorded to put KDB first.
-    const types = { "KDB": "Kdb","KDB_STREAMING": "Kdb_Streaming","MSSERVER": "Microsoft SQL Server","MYSQL": "MySQL","POSTGRES": "Postgres","REDIS": "Redis","APACHE_CALCITE_AVATICA": "Apache Calcite Avatica","APACHE_IGNITE": "Apache Ignite","APACHE_KYLIN": "Apache Kylin","KYUUBI_HIVE": "Apache Kyuubi","SPARK_HIVE": "Apache Spark","YANDEX_CLICKHOUSE": "ClickHouse (Yandex)","CLICKHOUSE_COM": "ClickHouse.com","CRATEDB": "CrateDB (Legacy)","CSVJDBC": "CSV","DB2_ISERIES": "Db2 for IBM i","DERBY": "Derby Embedded","DERBY_SERVER": "Derby Server","DOLPHINDB": "DolphinDB","DUCKDB": "DuckDB","ELASTICSEARCH": "Elasticsearch","GEMFIRE_XD": "Gemfire XD","H2": "H2","SAP_HANA": "HANA (Old)","HSQLDB_EMBEDDED": "HSQL Embedded","HSQLDB_SERVER": "HSQL Server","INFLUXDB": "InfluxDB","INFORMIX": "Informix","MONGODB": "MongoDB","MSACCESS_UCANACCESS": "MS Access (UCanAccess)","NEO4J": "Neo4j","NUODB": "NuoDB","OMNISCI": "OmniSci (formerly MapD)","ORACLE": "Oracle","PRESTO": "PrestoSQL","SNAPPYDATA": "SnappyData","SNOWFLAKE": "Snowflake","APACHE_SOLRJ": "Solr","SQLITE_JDBC": "SQLite","SQREAM": "SQream DB","TDENGINE": "TDengine","TERADATA": "Teradata","TRINO": "Trino", };
+    const types = { "KDB": "Kdb","KDB_STREAMING": "Kdb_Streaming","MSSERVER": "Microsoft SQL Server","MYSQL": "MySQL","POSTGRES": "Postgres","REDIS": "Redis","APACHE_CALCITE_AVATICA": "Apache Calcite Avatica","APACHE_IGNITE": "Apache Ignite","APACHE_KYLIN": "Apache Kylin","KYUUBI_HIVE": "Apache Kyuubi","SPARK_HIVE": "Apache Spark","YANDEX_CLICKHOUSE": "ClickHouse (Yandex)","CLICKHOUSE_COM": "ClickHouse.com","CRATEDB": "CrateDB (Legacy)","CSVJDBC": "CSV","DB2_ISERIES": "Db2 for IBM i","DERBY": "Derby Embedded","DERBY_SERVER": "Derby Server","DOLPHINDB": "DolphinDB","DUCKDB": "DuckDB","ELASTICSEARCH": "Elasticsearch","GEMFIRE_XD": "Gemfire XD","H2": "H2","SAP_HANA": "HANA (Old)","HSQLDB_EMBEDDED": "HSQL Embedded","HSQLDB_SERVER": "HSQL Server","INFLUXDB": "InfluxDB","INFORMIX": "Informix","MONGODB": "MongoDB","MSACCESS_UCANACCESS": "MS Access (UCanAccess)","NEO4J": "Neo4j","NUODB": "NuoDB","OMNISCI": "OmniSci (formerly MapD)","ORACLE": "Oracle","PRESTO": "PrestoSQL","SNAPPYDATA": "SnappyData","SNOWFLAKE": "Snowflake","APACHE_SOLRJ": "Solr","SQLITE_JDBC": "SQLite","SQREAM": "SQream DB","TDENGINE": "TDengine","TERADATA": "Teradata","TRINO": "Trino", "PROTON":"Timeplus Proton"};
     return <>
         <FormGroup label="Type:" labelFor="connType" inline>
             <HTMLSelect onChangeCapture={props.onChange}>
@@ -366,6 +366,7 @@ export function ConnectionHelp(props: { addConn: (jc: jdbcConnection) => void })
             <JdbcCoverPanel jdbcConn={jdbcConnection.POSTGRES} addConn={props.addConn} />
             <JdbcCoverPanel jdbcConn={jdbcConnection.MYSQL} addConn={props.addConn} />
             <JdbcCoverPanel jdbcConn={jdbcConnection.CLICKHOUSE} addConn={props.addConn} />
+            <JdbcCoverPanel jdbcConn={jdbcConnection.PROTON} addConn={props.addConn} />
         </div>
         <br style={{ clear: "left" }} />
     </div></>
@@ -427,6 +428,7 @@ class jdbcConnection extends Enumify {
     static TDENGINE = new jdbcConnection("TDENGINE", "TDengine", "jdbc:TAOS-RS://{host}:{port}/[{database}]", 6041);
     static TERADATA = new jdbcConnection("TERADATA", "Teradata", "jdbc:teradata://{host}/DATABASE={database},DBS_PORT={port}", 1025);
     static TRINO = new jdbcConnection("TRINO", "Trino", "jdbc:trino://{host}:{port}[/{database}]", 8080);
+    static PROTON = new jdbcConnection("PROTON", "Timeplus Proton", "jdbc:proton://{host}:{port}/{database}", 8123);
 
     static _ = jdbcConnection.closeEnum();
 
