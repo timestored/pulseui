@@ -10,10 +10,41 @@ It allows you to create and share real-time interactive applications with your t
 Pulse supports 40+ databases including kdb, postgresql, mysql, ms sql, clickhouse. 
 Databases that are wire compatible with postgres/mysql also work i.e. timescale, questdb, cockroachdb.
 
+# 2.xx Releases
 
+    2024-03-26 - 2.23 - Improved Pivot Table and Filter to save user settings. Support 100+ pie charts.
+    2024-03-13 - 2.22 - Dashboard Version Diffs. Improved scatter time-series chart. Copy-paste of panels.
+    2024-03-06 - 2.21 - Add SQL Audio Alerts. Improve display of kdb+ objects.
+    2024-03-03 - 2.20 - Numerous small bigfixes. Update dependencies, OWASP scan now passing.
+    2024-02-22 - 2.19 - Improved Scatter/Bubble chart tooltip and formatter.
+    2024-02-15 - 2.17 - Add Tabs. Improve query caching. Bugfixes for pivot/duckdb/legends.
+    2024-02-01 - 2.16 - OS specific builds to reduce download sizes. Minor bugfixes and UI improvements.
+    2024-01-19 - 2.14 - Expand roles and permissions for enterprise use, include permissioning data sources.
+    2023-12-20 - 2.13 - Improve clickhouse support, add encrypted connections and play.clickhouse.com demos.
+    2023-12-13 - 2.12 - Add KuCoin Streaming data source.
+    2023-12-07 - 2.11 - Add Marker Lines/Points and shaded areas to time-series charts.
+    2023-12-04 - 2.10 - Improve candlestick appearance and add Click-drag-to-zoom.
+    2023-11-29 - 2.09 - Allow Adding tags and comments to dashboards.
+    2023-11-27 - 2.08 - Add Binance candle/kline support.
+    2023-11-18 - 2.07 - Improve performance of table, time-series and display panels in general.
+    2023-11-15 - 2.06 - Add Ctrl+K SearchBar.
+    2023-11-11 - 2.05 - Cache latest queries and reuse results. 100 users with same query = 1 query.
+    2023-11-11 - 2.04 - Symbols - Allow querying and searching within UI using only symbols.
+    2023-11-09 - 2.03 - Add FRED - Federal Reserve Data Source.
+    2023-11-09 - 2.03 - Add ECB - European Central Bank Data Source.
+    2023-10-27 - 2.02 - Add BabelDB to query REST, CSV, JSON or streaming source.
+    2023-10-14 - 2.01 - Add owners/users/teams roles and permissions for dashboards.
+
+A massive thanks to all those that helped us reach 2.0.
+
+With the recent addition of advanced roles and permissions Pulse successfully scales out to solve real-time dashboards for multiple quant teams within one deploy.
 
 # 1.xx Releases
 
+    2023-09-05 - 1.70 - Add OrderBook streaming DepthMap visualization.
+    2023-08-25 - 1.60 - Support on-client appending for streaming Connections
+    2023-08-25 - 1.55 - Add Binance streaming data source.
+    2023-08-23 - 1.51 - Improve kdb connections to handle disconnects and no longer wrap queries.
     2023-08-18 - 1.50 - Open Sourced Version
     2023-08-14 - 1.36 - Improve server tree listing for more databases.
     2023-08-07 - 1.34 - Add variable formatters.
