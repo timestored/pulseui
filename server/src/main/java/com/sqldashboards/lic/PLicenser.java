@@ -25,7 +25,7 @@
  ******************************************************************************/
  
 package com.sqldashboards.lic;
-
+// Due to be removed.
 public class PLicenser {
 
 	/**
