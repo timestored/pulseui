@@ -1,6 +1,6 @@
 # Pulse
 
-![Pulse](/multi-chart3-dark.jpg)
+![Pulse](/demos/multi-chart3-dark.jpg)
 
 For more info see [timestored.com/pulse](http://timestored.com/pulse "timestored.com/pulse")
 
@@ -9,6 +9,21 @@ It allows you to create and share real-time interactive applications with your t
 
 Pulse supports 40+ databases including kdb, postgresql, mysql, ms sql, clickhouse. 
 Databases that are wire compatible with postgres/mysql also work i.e. timescale, questdb, cockroachdb.
+
+# Realtime SQL Data Apps
+
+![Pulse Demo](/demos/pulse-silent-demo.gif)
+
+# Notebooks
+
+Pulse [SQL Notebooks](http://timestored.com/sqlnotebook) are a code-driven method for building data applications with SQL. 
+This includes reports, analysis, monitoring and embedded dashboards. 
+Notebooks allow someone that knows SQL and a little markdown to create beatiful fully interactive data applications.
+
+For help getting started see: http://www.timestored.com/sqlnotebook
+
+![Pulse Demo](/demos/notebooks-301.png)
+
 
 # 3.xx Releases
 
