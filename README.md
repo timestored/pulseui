@@ -27,6 +27,32 @@ For help getting started see: http://www.timestored.com/sqlnotebook
 
 # 3.xx Releases
 
+    2025-04-22 - 3.16 - Add {{ALL}} variable
+        remove auto_sign_up flag.
+    2025-03-21 - 3.15 - Improve Git releases 
+        Force process pl-config directory every 10 minutes to ensure even if symlinked, they get updated.
+        Add file hash cache to reduce processing cost of git releases.
+    2025-01-22 - 3.14 - Improve null and error handling to backend database processes from java server, particularly for kdb.
+        Add KDB_ALWAYS_CLOSE_CONN_AFTER_USE - Specifically for enterprises that force close handles.
+        Form editor - added align / disabled / large / inline option flags per form input.
+    2024-12-21 - 3.13 - Date/time/minute timezone bugfix. 
+        Upgrade duckdb to 1.1.3. #288 
+        Grid click populates all variables.  #237 #255
+        Slider form input allows specifying step size. #262
+    2024-12-18 - 3.12 - Update NETTY version.
+    2024-12-18 - 3.11 - H2 Database upgrade from v1 to v2, requires manual steps. Pulse now requires Java 11.
+    
+    2024-12-13 - 3.05 - MySQL/PostgreSQL driver upgrades. REST api bugfix.#282 #283.
+    2024-12-10 - 3.04 - Larger code editor. #274.
+        Add Sankey Options #273
+        Heatmap decimal place formatting of labels as configured in UI. #273
+        Pie Chart - Add selectedMode to legend. #278
+        SQL Notebook - Add type='table' support to show full HTML tables rather than grid.
+        SQL Notebook - Allow charts and tables to be nested to allow column layouts.
+        Non-serif font for code editor blocks. #132
+    2024-11-22 - 3.03 - Add custom chart configuration. Pie chart supports custom area color. #274 #188 #269 #209
+    2024-11-20 - 3.02 - bugfix: Linux SERVER_HOST default fixed.
+    2024-11-18 - 3.01 - Officially Released for everyone.
     2024-11-18 - 3.01 - Officially Released for everyone.
     2024-11-18 - 	SQL Notebooks - Add built-in demos, website examples and small CSS improvements.
     2024-11-15 - 	SQL Notebooks - Bugfixes and stability improvements. e.g. auto reconnect when pulse/qstudio restarts.
