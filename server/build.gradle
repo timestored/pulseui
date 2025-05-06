@@ -44,6 +44,7 @@ dependencies {
 	implementation files('lib/mysql-connector-j-8.0.31.jar')
 	implementation files('lib/mssql-jdbc-11.2.0.jre8.jar')
 	implementation files('lib/redis-jdbc-driver-1.4.jar')
+	implementation("com.timeplus:proton-jdbc:0.4.0")
 	
 	implementation files('lib/jqi-0.0.1-SNAPSHOT-all.jar')
 	

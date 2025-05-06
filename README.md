@@ -7,7 +7,7 @@ For more info see [timestored.com/pulse](http://timestored.com/pulse "timestored
 Pulse is an open source tool for real-time visual analysis, email reporting and alerting.
 It allows you to create and share real-time interactive applications with your team.
 
-Pulse supports 40+ databases including kdb, postgresql, mysql, ms sql, clickhouse. 
+Pulse supports 40+ databases including kdb, postgresql, mysql, ms sql, clickhouse, proton. 
 Databases that are wire compatible with postgres/mysql also work i.e. timescale, questdb, cockroachdb.
 
 # Realtime SQL Data Apps
