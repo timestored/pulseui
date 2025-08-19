@@ -27,6 +27,26 @@ For help getting started see: http://www.timestored.com/sqlnotebook
 
 # 3.xx Releases
 
+	2025-08-19 - 3.23 - Add conditional formatting.
+		Add QDoc support for hosting QDocs on Pulse. https://www.timestored.com/qstudio/help/qdoc
+	2025-07-23 - 3.22 - Improve timezone handling. Improved dropdown rendering of dates/times.
+		Candesticker formatter improved.
+		Scatter now supports dual-axis.
+		Improved error logging to console when server fails to save pulsedb file.
+	2025-07-09 - 3.21 - Improve forms, all specifying size and intent.
+	    Spinning wheel on busy server queries.
+	    JS/HTML allow specifying {{USER}} variable.
+	2025-06-26 - 3.19 - Allow configuring columns based on regex of column names.
+	    Double-click on legend selects only that item.
+	    Add Toolbox to charts to allow download, zoom and viewing raw data.
+	2025-06-01 - 3.18 - Expose javascript functions to allow fully custom html/javascript.
+	    Upgrade DuckDB to 1.3.0.0.
+	    Upgrade ClickHouse driver to 0.8.6.
+	2025-05-12 - 3.17 - Improve Server Tree and QDocs integration. Add kdb+ Symbol Search.
+	    Form: Editor now supports 30,000+ items in dropdown and stays fast using virtualization.
+	    Bugfix: Form editor was showing duplicate inputs.
+	    SQL Editor - Show single cell as code text editor.
+	    Bugfix: Programmatic login casing fix.
     2025-04-22 - 3.16 - Add {{ALL}} variable
         remove auto_sign_up flag.
     2025-03-21 - 3.15 - Improve Git releases 
@@ -150,3 +170,4 @@ With the recent addition of Interactive Dashboards, Event Handlers and the numer
     2022-09-22 - Appearance - Various improvements and refinements to themes, forms, icons
     2022-08-24 - Add demos: stream liquidity, TAQ, candlestick
     2022-06-01 - First Release
+
