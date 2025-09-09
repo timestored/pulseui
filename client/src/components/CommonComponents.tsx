@@ -55,9 +55,9 @@ export const MyNavBar: FunctionComponent<{ rightChildren?: React.ReactNode, chil
       <Navbar className={"topNavBar" + (context.theme === "dark" ? " " : " ")} >
         <NavbarGroup align={Alignment.LEFT} className="leftNavbarGroup">
           <Link to="/dash"><NavbarHeading><Logo /></NavbarHeading></Link>
-          <Link to="/dash"><Button icon="dashboard" text="Dashboards" minimal={true} intent={isSel("dashboard")} title="Dashboards" /></Link>
-          <Link to="/sqleditor"><Button icon="database" minimal={true} text="SQL" intent={isSel("sqleditor")} title="SQL Editor" /></Link>
-          {isAdmin(context) && <Link to="/connections"><Button icon="globe-network" minimal={true} text="Connections" intent={isSel("connections")} title="Connections" /></Link>}
+          <Link to="/dash"><Button icon="dashboard" text="Dashboards" minimal={true} intent={isSel("dashboard")} title="Dashboards" className="nav-dashboards-button" data-testid="nav-dashboards" /></Link>
+          <Link to="/sqleditor"><Button icon="database" minimal={true} text="SQL" intent={isSel("sqleditor")} title="SQL Editor" className="nav-sql-editor-button" data-testid="nav-sql-editor" /></Link>
+          {isAdmin(context) && <Link to="/connections"><Button icon="globe-network" minimal={true} text="Connections" intent={isSel("connections")} title="Connections" className="nav-connections-button" data-testid="nav-connections" /></Link>}
           
           {children}
         </NavbarGroup>
@@ -87,7 +87,7 @@ function HelpButton(props:{isAdmin:boolean}) {
           <a href="mailto:pulse-support@timestored.com" target="_blank"><MenuItem icon="envelope"  text="Email" /></a>  {/* eslint-disable-next-line react/jsx-no-target-blank */}
           <a href="https://www.timestored.com/pulse/help/release-changes?utm_source=pulse&utm_medium=app&utm_campaign=pulse" target="_blank"><MenuItem text={"Version "+version} /></a>
         </Menu>}>
-        <Button icon="help" minimal />
+        <Button icon="help" minimal className="nav-help-button" data-testid="nav-help" />
       </Popover2>;
 }
 
@@ -106,10 +106,10 @@ function UserButton(props:{username:string | undefined, isAdmin:boolean}) {
             {props.isAdmin && <Link to="/settings"><MenuItem icon="cog"  text="Settings" /></Link>}
             <TimezoneSelect value={timezone} onChange={tz=>setTimezone(tz)} showLocalTimezone />
           </Menu>}>
-          <Button icon="user" minimal >{props.username}</Button>
+          <Button icon="user" minimal className="nav-user-button" data-testid="nav-user">{props.username}</Button>
         </Popover2>;
   }
-  return <Link to="/rlogin"><Button icon="log-in" minimal>Login</Button></Link>;
+  return <Link to="/rlogin"><Button icon="log-in" minimal className="nav-login-button" data-testid="nav-login">Login</Button></Link>;
 }
 
 

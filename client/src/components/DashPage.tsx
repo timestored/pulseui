@@ -321,7 +321,7 @@ export default function DashPage() {
     return <><div>
         <h1>Welcome to Pulse</h1>
         <div className="topButtons">
-            <Button icon="add" small onClick={addItem} intent={hasUserConn && !hasUserDash ? "success" : "primary"}>Add Dashboard</Button>
+            <Button icon="add" small onClick={addItem} intent={hasUserConn && !hasUserDash ? "success" : "primary"} className="dash-add-dashboard-button" data-testid="dash-add-dashboard">Add Dashboard</Button>
             {<Button small disabled={favourites.length<=0} 
                 title="You can favourite a dashboard by clicking on the star icon. Once you have favourites this button will pop-out all favourites to a new window at once."
                 onClick={() => {(data || []).forEach(dash => { if(favourites.includes(dash.id)) {openPopoutDash(dash)}})}}>
@@ -435,10 +435,10 @@ function DashBox(props:{dash:Dash, menu:JSX.Element, hideButtonsInitially:boolea
         <p className={props.hideButtonsInitially ? "whenhover" : ""}>
             {/* <Button minimal title="Favourite this dashboard." icon="star-empty" />
                 <Button minimal title="Like this dashboard." icon="thumbs-up" /> */}
-            <Button minimal title="Popout" icon="share" onClick={()=>openPopoutDash(d)} />
+            <Button minimal title="Popout" icon="share" onClick={()=>openPopoutDash(d)} className="dash-popout-button" data-testid="dash-popout" />
             <Button minimal title="Favourite" icon={favourites.includes(d.id) ? <Icon icon="star" color="#F7B000" /> : "star-empty"}
-                onClick={() => {if(favourites.includes(d.id)) { setFavourites(favourites.filter(e => e !== d.id))} else { setFavourites([...favourites,d.id])}}}  />
-            <Link to={editURL}><Button minimal title="Edit" icon="edit" >Edit</Button></Link>
+                onClick={() => {if(favourites.includes(d.id)) { setFavourites(favourites.filter(e => e !== d.id))} else { setFavourites([...favourites,d.id])}}} className="dash-favourite-button" data-testid="dash-favourite" />
+            <Link to={editURL}><Button minimal title="Edit" icon="edit" className="dash-edit-button" data-testid="dash-edit">Edit</Button></Link>
                 
             {/* <Link to={"/dash/reports/" + d.id + "/emails/" + d.name}><Button minimal title="Report Runs" icon="envelope"/></Link> */}
 

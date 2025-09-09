@@ -158,7 +158,7 @@ export type ColAlignOptions = "left"|"center"|"right";
 // These were the starting point:
 //    http://6pac.github.io/SlickGrid/examples/example-grid-menu.html   - Used as start point
 //    https://github.com/6pac/SlickGrid/blob/master/examples/example15-auto-resize.html  - paused this work as didn't work with react.
-export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, setArgTyped:SetArgsType, onConfigChange?:(s:SubConfig)=>void, actionRunner:ActionRunner }) {
+export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, setArgTyped:SetArgsType, onConfigChange?:(s:SubConfig)=>void, actionRunner:ActionRunner, className?:string, 'data-testid'?:string }) {
 
     // id will be set once when the component initially renders, but never again
     // (unless you assigned and called the second argument of the tuple)
@@ -434,7 +434,7 @@ export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, 
       updateGrid();
       const showPager = gc.pager !== undefined && gc?.pager !== "-2";
 
-    return <ChartWrapper className="grcontainer">
+    return <ChartWrapper className={`grcontainer ${props.className || ''}`} data-testid={props['data-testid']}>
         {showPager ?  
              <><ChartWrapper90 id={id} style={{ width:"100%" }}></ChartWrapper90><div id={pagerid} style={{height:"20px", width:"99%"}}></div></>
             :<ChartWrapper id={id} style={{ width:"100%" }}></ChartWrapper>}

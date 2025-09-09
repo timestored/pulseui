@@ -340,7 +340,7 @@ export class MyUpdatingChart extends Component<MyChartProps, MyUpdatingChartStat
             case "pie": return <EPie {...args}/>;
             case "scatter": return <EScatter etype="scatter" {...args} />;
             case "bubble": return <EScatter etype="bubble" {...args} />;
-            case "grid": return (<Suspense fallback={<div>Loading...</div>}><AGrid onConfigChange={onConfigChange} {...args} /></Suspense>);
+            case "grid": return (<Suspense fallback={<div>Loading...</div>}><AGrid onConfigChange={onConfigChange} {...args} className="sql-result-grid" data-testid="sql-result-grid" /></Suspense>);
             case "timeseries": return <ETimeSeries {...args} />;
             case "treemap": return <ETreeMap {...args} />;
             case "heatmap": return <EHeatMap {...args} />;

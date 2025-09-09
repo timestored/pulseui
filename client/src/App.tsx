@@ -202,7 +202,7 @@ export default function App() {
   }
 
   const rightOptions = <div>
-    <Button icon={theme === "dark" ? "lightbulb" : "moon"} onClick={toggleTheme} minimal></Button>
+    <Button icon={theme === "dark" ? "lightbulb" : "moon"} onClick={toggleTheme} minimal className="theme-toggle-button" data-testid="theme-toggle"></Button>
   </div>;
   document.body.className = theme === "dark" ? 'bodydark' : 'bodylight';
   

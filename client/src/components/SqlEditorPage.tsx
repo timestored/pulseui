@@ -241,19 +241,22 @@ function CodeEditor(props:{queryEngine:QueryEngine, serverConfigs:ServerConfig[]
             const newUrl = addParameter(window.location.href,"qry",qcode);
             copyToClipboard(newUrl); 
             notyf.success("Shareable URL has been copied to your clipboard"); 
-        }} >Share All Code</Button>
+        }} className="sql-share-all-button" data-testid="sql-share-all">Share All Code</Button>
         <Button small icon={<HiShare />} disabled={lastQuerySent.length <= 0} onClick={() => {
             const newUrl = addParameter(window.location.href,"qry",lastQuerySent);
             copyToClipboard(newUrl); 
             notyf.success("Shareable URL has been copied to your clipboard"); 
-        }} >Share Latest Result</Button>
+        }} className="sql-share-result-button" data-testid="sql-share-result">Share Latest Result</Button>
         
         <Button small intent="primary" rightIcon="arrow-right" disabled={queryable === undefined} title="Keyboard Shortcut: Control + E"
-                onClick={() => { queryable && sendQuery(queryable); }} >Run All</Button>
+                onClick={() => { queryable && sendQuery(queryable); }} 
+                className="sql-run-all-button" data-testid="sql-run-all">Run All</Button>
         <Button small intent="primary" rightIcon="text-highlight" disabled={queryable === undefined} title="Keyboard Shortcut: Control + E"
-                        onClick={() => { queryable && sendQuery({...queryable, query:editorSelection.selection}); }} >Run Selected</Button>                
+                        onClick={() => { queryable && sendQuery({...queryable, query:editorSelection.selection}); }} 
+                        className="sql-run-selected-button" data-testid="sql-run-selected">Run Selected</Button>                
         <Button small intent="primary" rightIcon="key-enter" disabled={queryable === undefined} title="Keyboard Shortcut: Control + Enter"
-                        onClick={() => { queryable && sendQuery({...queryable, query:editorSelection.line});}} >Run Line</Button>                
+                        onClick={() => { queryable && sendQuery({...queryable, query:editorSelection.line});}} 
+                        className="sql-run-line-button" data-testid="sql-run-line">Run Line</Button>
 
     </>;
 
@@ -279,7 +282,8 @@ function CodeEditor(props:{queryEngine:QueryEngine, serverConfigs:ServerConfig[]
                 </div>
                 <SqlEditor runLine={t => sendQuery({...queryable, query:t})}  runSelection={t => sendQuery({...queryable, query:t})} 
                             value={queryable.query}  onChange={(t) => setQueryable({...queryable, query:t})} 
-                            onSelectionChange={(line,selection) => { setEditorSelection({line,selection}); }} />
+                            onSelectionChange={(line,selection) => { setEditorSelection({line,selection}); }} 
+                            className="sql-code-editor" />
             </div>}
         
         </div>

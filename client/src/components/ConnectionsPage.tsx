@@ -99,7 +99,7 @@ function ConnectionsPage() {
         refreshServerConfigs();
     }
     const isEmpty = serverConfigs.length === 0;
-    const addDCbutton = <Button icon="add" small onClick={() => { setEditId(newServerConfig); }} intent={containsUserConn(serverConfigs) ? "primary" : "success"}>Connect Data</Button>;
+    const addDCbutton = <Button icon="add" small onClick={() => { setEditId(newServerConfig); }} intent={containsUserConn(serverConfigs) ? "primary" : "success"} className="conn-add-connection-button" data-testid="conn-add-connection">Connect Data</Button>;
 
     return <><div>
         <h1>Connections</h1>
@@ -322,8 +322,8 @@ class ConnectionsEditor extends Component<EditorProps, ConnectionsEditorState> {
                         </Collapse>
                     </div>}
 
-                <Button intent="primary" type="submit" disabled={this.state.testState.state === "failed" || this.state.saveState.state === "running"}>{isAdd ? "Add" : "Save"}</Button>&nbsp;
-                <Button intent="success" onClick={this.testConn}>Test</Button>
+                <Button intent="primary" type="submit" disabled={this.state.testState.state === "failed" || this.state.saveState.state === "running"} className="conn-save-button" data-testid="conn-save">{isAdd ? "Add" : "Save"}</Button>&nbsp;
+                <Button intent="success" onClick={this.testConn} className="conn-test-button" data-testid="conn-test">Test</Button>
                 <AjaxResButton mystate={this.state.testState} succeededMsg="Connected" />
                 <AjaxResButton mystate={this.state.saveState} succeededMsg="Saved" />
                 < br />
@@ -376,7 +376,7 @@ function JdbcCoverPanel(props: { jdbcConn: jdbcConnection, addConn: (jc: jdbcCon
     return <div className="floatbox" style={{ minWidth:"170px", minHeight:"90px", }}>
         <h4>{props.jdbcConn.niceName}</h4>
         <p><img src="/img/t.gif" height="64" width="64" className={"zu-"+props.jdbcConn.name.toLowerCase()} alt={props.jdbcConn.niceName + " logo"}  /></p>
-        <p><Button small title="Add this connection." icon="add" onClick={() => props.addConn(props.jdbcConn)} >Add Connection</Button></p>
+        <p><Button small title="Add this connection." icon="add" onClick={() => props.addConn(props.jdbcConn)} className="conn-type-add-button" data-testid={`conn-add-${props.jdbcConn.name.toLowerCase()}`}>Add Connection</Button></p>
     </div>
 }
 
