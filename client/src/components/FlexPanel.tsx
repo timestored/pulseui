@@ -50,7 +50,6 @@ import AEditor from './AEditor';
 import html2canvas from 'html2canvas';
 import { Popover2 } from '@blueprintjs/popover2';
 import { debounce, get } from 'lodash-es';
-import { BlueprintIcons_16Id } from '@blueprintjs/icons/lib/esm/generated/16px/blueprint-icons-16';
 const AText = React.lazy(() => import('./AText'));
 
 export const DEFAULT_GLOBAL = {
@@ -493,7 +492,7 @@ function TopMenu(props:TopMenuProps) {
     const makeBut = (c:ChartType, txt:string|null = null, intent?:Intent) => {
         const addCt = debounce(() => addWidget(c),MILLIS);
         return <Button  key={c} small={true} onMouseDown={addCt} onClick={()=>addCt.flush()} icon={getChartIcon(c)} intent={intent}>{txt}</Button>};
-    const makeMenu = (icon:BlueprintIcons_16Id | MaybeElement, txt:string, f:()=>void) => {
+    const makeMenu = (icon: MaybeElement, txt:string, f:()=>void) => {
         const addCt = debounce(f,MILLIS);
         return <MenuItem onMouseDown={addCt} onClick={()=>addCt.flush()} key={txt} icon={icon} text={txt}></MenuItem> };
     const makeCMenu = (c:ChartType, txt:string) => makeMenu(getChartIcon(c), txt, () => addWidget(c));
