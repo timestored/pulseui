@@ -84,6 +84,7 @@ interface FlexPanelState {
     model: Model | null,
     dash: Dash | null,
     isNew:boolean,
+    hasUnsavedChanges: boolean,
 }
 interface FlexPanelProps {
     queryEngine:QueryEngine, dashId:number, versionId?:number, editMode:boolean, setTitle:(txt:JSX.Element) => void
@@ -111,10 +112,12 @@ class InnerFlexPanel extends Component<FlexPanelProps & {serverConfigs:ServerCon
         model: null,
         dash: null,
         isNew: false,
+        hasUnsavedChanges: false,
     } 
     static contextType = ThemeContext;
     context!: React.ContextType<typeof ThemeContext>;
     private layoutRef: RefObject<Layout> = createRef<Layout>();
+    private autoSaveTimer: NodeJS.Timeout | null = null;
     private isEditPermitted = () => this.props.editMode && this.props.versionId === undefined;
     
     changeName = (newName:string) => { // @ts-ignore
@@ -171,7 +174,98 @@ class InnerFlexPanel extends Component<FlexPanelProps & {serverConfigs:ServerCon
 
     componentDidMount() {
         this.loadDashAndServers(this.props.dashId, this.props.versionId);
+        this.checkForUnsavedChanges();
     }
+
+    componentWillUnmount() {
+        if (this.autoSaveTimer) {
+            clearTimeout(this.autoSaveTimer);
+        }
+    }
+
+    private getAutoSaveKey = () => `dash-autosave-${this.props.dashId}`;
+
+    private checkForUnsavedChanges = () => {
+        const autoSaveKey = this.getAutoSaveKey();
+        const savedData = localStorage.getItem(autoSaveKey);
+        if (savedData && this.isEditPermitted()) {
+            try {
+                const parsed = JSON.parse(savedData);
+                if (parsed.timestamp && parsed.data) {
+                    const timeDiff = Date.now() - parsed.timestamp;
+                    // Only restore if saved within last 24 hours
+                    if (timeDiff < 24 * 60 * 60 * 1000) {
+                        notyf.success({
+                            type: "info",
+                            message: "Found unsaved changes from your previous session. Click 'Restore' to recover them.",
+                            duration: 10000
+                        });
+                        this.setState({ hasUnsavedChanges: true });
+                    }
+                }
+            } catch (e) {
+                console.warn("Failed to parse auto-save data", e);
+                localStorage.removeItem(autoSaveKey);
+            }
+        }
+    };
+
+    private autoSaveToLocal = () => {
+        if (!this.isEditPermitted() || !this.state.model || !this.state.dash) {
+            return;
+        }
+
+        const autoSaveKey = this.getAutoSaveKey();
+        const saveData = {
+            timestamp: Date.now(),
+            data: this.state.model.toJson(),
+            dashData: this.state.dash
+        };
+
+        try {
+            localStorage.setItem(autoSaveKey, JSON.stringify(saveData));
+            this.setState({ hasUnsavedChanges: true });
+        } catch (e) {
+            console.warn("Failed to auto-save to localStorage", e);
+        }
+    };
+
+    private scheduleAutoSave = () => {
+        if (this.autoSaveTimer) {
+            clearTimeout(this.autoSaveTimer);
+        }
+        
+        if (this.isEditPermitted()) {
+            this.autoSaveTimer = setTimeout(() => {
+                this.autoSaveToLocal();
+            }, 5000); // Auto-save every 5 seconds
+        }
+    };
+
+    private clearUnsavedChanges = () => {
+        const autoSaveKey = this.getAutoSaveKey();
+        localStorage.removeItem(autoSaveKey);
+        this.setState({ hasUnsavedChanges: false });
+    };
+
+    private restoreFromAutoSave = () => {
+        const autoSaveKey = this.getAutoSaveKey();
+        const savedData = localStorage.getItem(autoSaveKey);
+        
+        if (savedData) {
+            try {
+                const parsed = JSON.parse(savedData);
+                if (parsed.data) {
+                    const model = Model.fromJson(parsed.data);
+                    this.setState({ model, hasUnsavedChanges: true });
+                    notyf.success("Restored from auto-save");
+                }
+            } catch (e) {
+                console.warn("Failed to restore from auto-save", e);
+                notyf.error("Failed to restore auto-saved changes");
+            }
+        }
+    };
 
     factory(node:TabNode) {
         const component = node.getComponent() ?? "";
@@ -249,7 +343,7 @@ class InnerFlexPanel extends Component<FlexPanelProps & {serverConfigs:ServerCon
 
         return (
             <div className={"FlexPanel dashname-"+this.state.dash?.name.replaceAll(" ","-")} id={"dashid-"+this.props.dashId}>
-            {this.isEditPermitted() && <TopMenu addWidget={this.handleAddWidget} saveDashboard={this.saveDashboard} highlightAddButtons={isNewOrEmpty}  />}
+            {this.isEditPermitted() && <TopMenu addWidget={this.handleAddWidget} saveDashboard={this.saveDashboard} highlightAddButtons={isNewOrEmpty} hasUnsavedChanges={this.state.hasUnsavedChanges} restoreFromAutoSave={this.restoreFromAutoSave} />}
 
             {(this.props.serverConfigs.length > 0) && 
             <FlexContainer topMargin={topMargin} rightMargin={rightMargin} id="dashScreenshotContainer" >
@@ -257,7 +351,11 @@ class InnerFlexPanel extends Component<FlexPanelProps & {serverConfigs:ServerCon
                                 onAction={this.handleAction}  
                                 onRenderTabSet={this.onRenderTabSet} 
                                 font={{size:"16px"}}
-                                //onModelChange={() => this.setState({modelChangesSaved:false})} Could listen to detect unsaved changes
+                                onModelChange={() => {
+                                    if (this.isEditPermitted()) {
+                                        this.scheduleAutoSave();
+                                    }
+                                }}
                 />}
             </FlexContainer>}
             </div>);
@@ -306,6 +404,7 @@ class InnerFlexPanel extends Component<FlexPanelProps & {serverConfigs:ServerCon
             const d: Dash = { ...this.state.dash, ...{ data: this.state.model!.toJson(), defaultParams:params } };
             
             saveDash(d).then(r => {
+                this.clearUnsavedChanges(); // Clear unsaved changes after successful save
                 if(typeof r.data.data === 'string') {
                     const sz = (r.data.data as string).length;
                     if(sz > 500*1024) { // roughly 5000*80 lines of text. Warn as it makes versioning and database grow in size.
@@ -367,13 +466,15 @@ interface TopMenuProps {
     addWidget: (name: WidgetType) => void;
     saveDashboard: () => void;
     highlightAddButtons: boolean,
+    hasUnsavedChanges: boolean;
+    restoreFromAutoSave: () => void;
 }
 
 
 
 
 function TopMenu(props:TopMenuProps) {
-    const { addWidget, highlightAddButtons } = props;
+    const { addWidget, highlightAddButtons, hasUnsavedChanges, restoreFromAutoSave } = props;
 
     const wrapTip = (children?: React.ReactNode) => {
         return <Popover2 defaultIsOpen placement="bottom" canEscapeKeyClose={false}
@@ -434,7 +535,13 @@ function TopMenu(props:TopMenuProps) {
             <Button small={s} icon="form" key="aform" onClick={()=>addForm.flush()} onMouseDown={addForm}>User Form</Button>
             <Button small={s} icon={<VscSymbolVariable />} key="variables" onClick={()=>addDebug.flush()} onMouseDown={addDebug}>Debug</Button>
             
-            <Button small={s} key="save"  icon="floppy-disk" onClick={() => { props.saveDashboard();}} style={{marginLeft:"60px"}} intent="primary">Save</Button>
+            {hasUnsavedChanges && 
+                <Button small={s} key="restore" icon="history" onClick={restoreFromAutoSave} style={{marginLeft:"20px"}} intent="warning">Restore Auto-saved</Button>
+            }
+            
+            <Button small={s} key="save"  icon="floppy-disk" onClick={() => { props.saveDashboard();}} style={{marginLeft: hasUnsavedChanges ? "10px" : "60px"}} intent="primary">
+                Save {hasUnsavedChanges && <span style={{marginLeft:"5px", fontSize:"10px"}}>●</span>}
+            </Button>
         </ButtonGroup>
     </div>;
     

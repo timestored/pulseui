@@ -56,6 +56,7 @@ export default function DashboardPage(props:{rightOptions:JSX.Element}) {
     const [errorText,setErrorText] = useState<string | undefined>("");
     const [warningText,setWarningText] = useState<string | undefined>("");
     const [editMode,setEditMode] = useState(false);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const queryEngine = useRef<QueryEngine | null>(null);
     const context = useContext(ThemeContext);
 
@@ -106,6 +107,36 @@ export default function DashboardPage(props:{rightOptions:JSX.Element}) {
       queryEngine?.current?.shutDown();
     };
   },[dId,versionId]);
+
+  // Add beforeunload warning for unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (editMode && hasUnsavedChanges) {
+        event.preventDefault();
+        event.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+        return 'You have unsaved changes. Are you sure you want to leave?';
+      }
+    };
+
+    const checkForUnsavedChanges = () => {
+      if (dashId) {
+        const autoSaveKey = `dash-autosave-${dashId}`;
+        const savedData = localStorage.getItem(autoSaveKey);
+        setHasUnsavedChanges(!!savedData);
+      }
+    };
+
+    // Check for unsaved changes on mount and periodically
+    checkForUnsavedChanges();
+    const interval = setInterval(checkForUnsavedChanges, 1000);
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      clearInterval(interval);
+    };
+  }, [editMode, hasUnsavedChanges, dashId]);
 
 
   const EditToggle = () => {
