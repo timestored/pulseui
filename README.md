@@ -27,6 +27,28 @@ For help getting started see: http://www.timestored.com/sqlnotebook
 
 # 3.xx Releases
 
+## 2025-09-13 — 3.25 — Enable User Customization
+- Add burger menu that allows end user chart and table customization (user Control option?).
+- Add conditional formatting to right-click context menu.
+- Tags support multiples.
+- SQL Notebooks — Add copy to clipboard to code displays.
+- Add clickable **SD_LINK** columns in tables [help](http://www.timestored.com/pulse/help/table-row-formatting).
+- Connection Scalability — Improve JDBC connection pool settings for large 100+ user deploys.
+
+## 2025-09-10 — 3.24 — Improvements to Forms
+- Form editor now supports multi-column drag-and-drop.
+- Add Icon support to buttons and text inputs.
+- Select multi-dropdown supports `__ALL__` for when there are lots of options.
+- Add intent and size support to all controls.
+- Checkbox and Radio support segmented style.
+- Improved date pickers [help](https://www.timestored.com/pulse/help/form-date-inputs).
+- Change default to 30 min refresh.
+- Add ability to delete variables in debug UI.
+- **Bugfix:** Select multi-dropdown no longer scrolls to top on selection.
+- **Bugfix:** Non-editors shown some editor controls when receiving URL.
+- **Bugfix:** SQL Notebooks — Fix show queries button.
+
+```
 	2025-08-19 - 3.23 - Add conditional formatting.
 		Add QDoc support for hosting QDocs on Pulse. https://www.timestored.com/qstudio/help/qdoc
 	2025-07-23 - 3.22 - Improve timezone handling. Improved dropdown rendering of dates/times.
@@ -88,6 +110,7 @@ For help getting started see: http://www.timestored.com/sqlnotebook
     2024-10-02 - 	SQL Notebooks - Add show query option. Add page and table of contents listing.
     2024-09-30 - 	SQL Notebooks initial test version given to select users for feedback.
     2024-09-28 - 	BabelDB, improve speed by using bulk inserts. (Benchmarks here)
+```
 
 A massive thanks to all those that helped us reach 3.0. Particularly Brian Luft and Rich Brown for all their creative input and testing.
 
@@ -170,4 +193,5 @@ With the recent addition of Interactive Dashboards, Event Handlers and the numer
     2022-09-22 - Appearance - Various improvements and refinements to themes, forms, icons
     2022-08-24 - Add demos: stream liquidity, TAQ, candlestick
     2022-06-01 - First Release
+
 
