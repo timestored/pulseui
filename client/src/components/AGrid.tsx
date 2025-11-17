@@ -58,7 +58,7 @@ import { ActionRunner, ColConfig, ColFormat, ColumnConfig, getEmptySubConfig, Su
 import { SetArgsType } from "../engine/queryEngine";
 import { ThemeContext } from "../context";
 import { DeepPartial } from "utility-types";
-import { createAddlHeaderRow, doSparkLines, FilterMenu, FilterType, getFilterResult, getSlickFormatter } from "./AGridHelper";
+import { createAddlHeaderRow, doSparkLines, FilterMenu, FilterType, FooterMenu, getFilterResult, getSlickFormatter, updateFooterRow } from "./AGridHelper";
 
 // Notice even though we currently only support bold/normal, we store them as same names as TextStyleFrow AND CSS. 
 // This is in case we want to support more options in future. e.g. bolder/lighter.
@@ -87,6 +87,8 @@ export type GridConfig = {
     showFilters: boolean,
     showPreheaderPanel: boolean,
     showContextMenu: boolean,
+    showFooterRow: boolean,
+    footerConfig: FooterConfig,
     pager:string,
     frozenRow: number,
     autosizeColumns:boolean,
@@ -151,9 +153,11 @@ function comparer(a:any, b:any, sortcol:string) {
 
 
 export const defaultGridConfig:GridConfig = {
-    showPulsePivot:false, showPreheaderPanel: false, showFilters: false, frozenRow: 0, showContextMenu: true, pager: "100", autosizeColumns: true, gridclmConfig: {} };
+    showPulsePivot:false, showPreheaderPanel: false, showFilters: false, showFooterRow: true, footerConfig: {}, frozenRow: 0, showContextMenu: true, pager: "100", autosizeColumns: true, gridclmConfig: {} };
 
 export type ColAlignOptions = "left"|"center"|"right";
+export type FooterAggregationType = "none" | "sum" | "avg" | "count" | "min" | "max" | "unique" | "auto";
+export type FooterConfig = { [columnId: string]: FooterAggregationType };
 
 // These were the starting point:
 //    http://6pac.github.io/SlickGrid/examples/example-grid-menu.html   - Used as start point
@@ -169,6 +173,7 @@ export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, 
     const [columnFiltersTypes, setColumnFilterTypes] = useState<{[k:string]:FilterType}>({});
     const [showContextMenu, setShowContextMenu] = useState({visible:false, x:0, y:0, colName:"", rowItem:{}});
     const [showFilterMenu, setShowFilterMenu] = useState({visible:false, x:0, y:0, colName:""});
+    const [showFooterMenu, setShowFooterMenu] = useState({visible:false, x:0, y:0, colName:""});
     const context = useContext(ThemeContext);
     
     const gridRef = useRef(null);
@@ -211,8 +216,12 @@ export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, 
           const n = props.srs ? props.srs.count() : 0;
         //   console.log("updating data");
           const dv = dataViewRef.current; // @ts-ignore
+          const gridData = srs.rsdata.tbl.data.map((e,i) => {e['id'] = n - i; return e});
+          
+          
           dv.beginUpdate(); // @ts-ignore
-          dv.setItems(srs.rsdata.tbl.data.map((e,i) => {e['id'] = n - i; return e})); // @ts-ignore
+          dv.setItems(gridData); // @ts-ignore
+          
           if(gc.autosizeColumns) { // @ts-ignore
             gridRef.current.autosizeColumns();
           }
@@ -240,6 +249,12 @@ export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, 
           } // @ts-ignore
           dv.endUpdate(); // @ts-ignore
           gridRef.current.invalidate();
+          
+          // Update footer calculations
+          if(gc.showFooterRow && gridRef.current) { // @ts-ignore
+            updateFooterRow(gridRef.current, gridRef.current.getColumns(), gridData, newTypes, gc.footerConfig);
+          }
+          
           doSparkLines(context.theme);
         }
       }
@@ -252,7 +267,8 @@ export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, 
     const hideContextMenus = useCallback(() => {
         if(showContextMenu.visible) { setShowContextMenu({visible:false, x:0, y:0, colName:"", rowItem:{}})  }
         if(showFilterMenu.visible) { setShowFilterMenu({visible:false, x:0, y:0, colName:""})  }
-    },[showContextMenu,showFilterMenu]);
+        if(showFooterMenu.visible) { setShowFooterMenu({visible:false, x:0, y:0, colName:""})  }
+    },[showContextMenu,showFilterMenu,showFooterMenu]);
 
     function setColumnAlign(colName:string, colAlign:ColAlignOptions) {
         const newGridConfig = set(props.subConfig.gridConfig,"gridclmConfig."+colName+".textAlign", colAlign);
@@ -265,6 +281,10 @@ export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, 
     function setColumnWidth(colName:string, width:number | undefined) {
         const newColConfig = set(props.subConfig.colConfig,colName+".colWidth",width);
         props.onConfigChange && props.onConfigChange({...props.subConfig, colConfig:newColConfig});
+    }
+    function setFooterAggregation(colName:string, aggregationType:FooterAggregationType) {
+        const newGridConfig = set(props.subConfig.gridConfig,"footerConfig."+colName, aggregationType);
+        props.onConfigChange && props.onConfigChange({...props.subConfig, gridConfig:newGridConfig});
     }
 
     // Listen to parent container size changes and if it happens resize grid
@@ -284,11 +304,14 @@ export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, 
               enableColumnReorder: true,
               enableAddRow: false,
               editable: false,  
-              showHeaderRow: true, // This must initially be true or header doesn't get drawc correctly. 
+              showHeaderRow: true, // This must initially be true or header doesn't get drawc correctly.
               headerRowHeight: gc.showFilters ? 30 : 0,
             //   rowHeight:24,
               createPreHeaderPanel: gc.showPreheaderPanel, // preheader panel is for grouped column headers
               showPreHeaderPanel: gc.showPreheaderPanel,
+              createFooterRow: gc.showFooterRow,
+              showFooterRow: gc.showFooterRow,
+              footerRowHeight: gc.showFooterRow ? 28 : 0,
               frozenRow:gc.frozenRow ?? -1,
               preHeaderPanelHeight: gc.showPreheaderPanel ? 25 : undefined,
               enableAutoSizeColumns: gc.autosizeColumns,  
@@ -388,6 +411,7 @@ export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, 
                 doSparkLines(context.theme); // without this, scrolling causes sparkLines NOT to display until new data arrives.
             });
 
+
             // wire up model events to drive the grid
             dataView.onRowCountChanged.subscribe(function () {
                 grid.updateRowCount();
@@ -422,6 +446,16 @@ export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, 
                 const colDef = grid.getColumns()[grid.getColumnIndex(e.triggeredByColumn)];
                 setColumnWidth(colDef.originalName, colDef.width);
             });
+            
+            // Add footer row click handler for aggregation type selection
+            if(gc.showFooterRow) {
+                $(document).on('click', '#' + id + ' .footer-clickable', function(e) {
+                    const columnId = $(this).data('column-id');
+                    if(columnId) {
+                        setShowFooterMenu({visible: true, x: e.pageX, y: e.pageY, colName: columnId});
+                    }
+                });
+            }
             updateGrid();
   
             return () => { 
@@ -450,6 +484,15 @@ export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, 
         {showFilterMenu.visible && <FilterMenu x={showFilterMenu.x} y={showFilterMenu.y}  
             selectionMade={(ft) => { hideContextMenus(); setColumnFilterTypes({...columnFiltersTypes, [showFilterMenu.colName]:ft }) }}
             selected={columnFiltersTypes[showFilterMenu.colName]} />}
+
+        {showFooterMenu.visible && <FooterMenu x={showFooterMenu.x} y={showFooterMenu.y}  
+            colName={showFooterMenu.colName}
+            dataType={types.current[showFooterMenu.colName] || "string"}
+            currentAggregation={gc.footerConfig[showFooterMenu.colName] || "auto"}
+            selectionMade={(aggregationType) => { 
+                hideContextMenus(); 
+                setFooterAggregation(showFooterMenu.colName, aggregationType as FooterAggregationType);
+            }} />}
     </ChartWrapper>;
   }
 
@@ -499,6 +542,7 @@ export function containsGridSDcol(colName:string) {
     }
     return false;
 }
+
 
 
 export function generateColDefs(allColNames: string[], types: DataTypeMap, enableGrouping: boolean, colConfig:ColConfig, gridConfig:DeepPartial<GridConfig>) {

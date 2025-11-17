@@ -41,6 +41,7 @@ import _uniqueId from 'lodash-es/uniqueId';
 import { ChartWrapper, ChartWrapper90 } from "../styledComponents";
 import { ColConfig,  SubConfig } from "./ChartFactory";
 import { containsGridSDcol } from "./AGrid";
+import { updateFooterRow } from "./AGridHelper";
 
 
 
@@ -48,6 +49,7 @@ export type GridConfig = {
     showFilters?: boolean,
     showPreheaderPanel?: boolean,
     showContextMenu?: boolean,
+    showFooterRow?: boolean,
     pager?:string,
     frozenRow?: number,
     autosizeColumns?:boolean,
@@ -71,7 +73,7 @@ export default function SimpleGrid(props:{ srs: SmartRs | null, subConfig:SubCon
     const columnFormattersRef = useRef<ColConfig>({});
     
     const srs = props.srs;
-    const gc:GridConfig = { showPreheaderPanel:false, showFilters:false, frozenRow:1,  showContextMenu:true, pager:"0", autosizeColumns:false };
+    const gc:GridConfig = { showPreheaderPanel:false, showFilters:false, showFooterRow:true, frozenRow:1,  showContextMenu:true, pager:"0", autosizeColumns:false };
     
     const updateGrid = (forceRefresh = false) => {
       if(gridRef.current  && dataViewRef.current) {
@@ -94,9 +96,15 @@ export default function SimpleGrid(props:{ srs: SmartRs | null, subConfig:SubCon
         //   console.log("updating data");
           const dv = dataViewRef.current; // @ts-ignore
           dv.beginUpdate(); // @ts-ignore
-          dv.setItems(srs.rsdata.tbl.data.map((e,i) => {e['id'] = n - i; return e})); // @ts-ignore
+          const gridData = srs.rsdata.tbl.data.map((e,i) => {e['id'] = n - i; return e});
+          dv.setItems(gridData); // @ts-ignore
           dv.endUpdate(); // @ts-ignore
           gridRef.current.invalidate();
+          
+          // Update footer calculations
+          if(gc.showFooterRow && gridRef.current) { // @ts-ignore
+            updateFooterRow(gridRef.current, gridRef.current.getColumns(), gridData, newTypes);
+          }
         }
       }
     }
@@ -121,7 +129,10 @@ export default function SimpleGrid(props:{ srs: SmartRs | null, subConfig:SubCon
             const options = { // https://github.com/6pac/SlickGrid/wiki/Grid-Options
           
               frozenRow:gc.frozenRow ?? -1,
-              enableAutoSizeColumns: gc.autosizeColumns,  
+              enableAutoSizeColumns: gc.autosizeColumns,
+              createFooterRow: gc.showFooterRow,
+              showFooterRow: gc.showFooterRow,
+              footerRowHeight: gc.showFooterRow ? 28 : 0,  
               explicitInitialization: true,  // don't initialize until we call .init(). Probably needed for burger menu.
               forceFitColumns: gc.autosizeColumns,
             //   columnPicker, - Have to disable this as it would need us to know the columns in advance currently.

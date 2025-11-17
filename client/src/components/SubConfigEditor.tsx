@@ -139,6 +139,7 @@ const GridEditor = (props:JsonEditorArgs) => {
 			<BooleanFrow label="showPulsePivot" {...a} allowIndeterminate={false} customLabel={<Icon icon="pivot-table" size={16} />} />
 			<ChoiceFrow label='pager' choices={["-2","0","25","50","100"]} niceNames={["none","All","25","50","100"]}  {...a} />
 			<BooleanFrow label="showPreheaderPanel" {...a} allowIndeterminate={false} />
+			<BooleanFrow label="showFooterRow" {...a} allowIndeterminate={false} niceName="show Footer Totals" />
 			<BooleanFrow label="autosizeColumns" {...a} allowIndeterminate={false}  />
 			<BooleanFrow label="showFilters" {...a} allowIndeterminate={false}  />
 			<BooleanFrow label="showContextMenu" {...a}  niceName="show Right-Click Menu" allowIndeterminate={false}  />
