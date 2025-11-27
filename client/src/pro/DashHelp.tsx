@@ -39,9 +39,9 @@ export type KnownDashTitles = "Price Grid"|"Trade Blotter";
 export function getDashCoverImg(dashTitle:KnownDashTitles|string) {
     const n = dashTitle;
      if(n === "Price Grid") {
-        return "./img/dashcovers/price-grid-small.png";
+        return "./img/price-grid-small.png";
     } else if(n === "Trade Blotter") {
-        return "./img/dashcovers/blotter2.png";
+        return "./img/blotter2.png";
     }
     return null;
 }
