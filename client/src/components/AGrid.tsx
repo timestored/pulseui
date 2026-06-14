@@ -59,6 +59,7 @@ import { SetArgsType } from "../engine/queryEngine";
 import { ThemeContext } from "../context";
 import { DeepPartial } from "utility-types";
 import { createAddlHeaderRow, doSparkLines, FilterMenu, FilterType, getFilterResult, getSlickFormatter } from "./AGridHelper";
+import { getGridCellSelection, GridCellPosition } from "./AGridSelection";
 
 // Notice even though we currently only support bold/normal, we store them as same names as TextStyleFrow AND CSS. 
 // This is in case we want to support more options in future. e.g. bolder/lighter.
@@ -367,19 +368,28 @@ export default function AGrid(props:{ srs: SmartRs | null, subConfig:SubConfig, 
               }
             }); 
             
+            const updateSelectedArgs = (position:GridCellPosition) => {
+                const selection = getGridCellSelection(grid, position);
+                if(selection) {
+                    props.setArgTyped({ series:selection.column.name, ...selectArgs(selection.item)});
+                }
+            };
+
+            // SlickGrid emits this for both mouse selection and keyboard navigation.
+            grid.onActiveCellChanged.subscribe(function (e:any, position:GridCellPosition) {
+                updateSelectedArgs(position);
+            });
+
             // can't use this onClick as FlexLayout blocks the first ever click on a panel
             // grid.onClick.subscribe(function (e:any, args:{row:number, cell:number}) {
-            
             $('#'+id).on("mousedown", function (e) {
                 const args = grid.getCellFromEvent(e);
                 if(args && typeof args.cell == "number" && typeof args.row == "number") {
                     grid.setActiveCell(args.row, args.cell);
-                    const itm = grid.getDataItem(args.row)
-                    const colDef = grid.getColumns()[args.cell];
-                    if(typeof itm === "object") {
-                        props.setArgTyped({ series:colDef.name, ...selectArgs(itm)}); 
-                        const ahsToRun = subConfigRef.current.actionHandlers.filter(a => a.trigger === "Click" && (a.name === "" || a.name === colDef.name));
-                        props.actionRunner(ahsToRun, itm);
+                    const selection = getGridCellSelection(grid, args);
+                    if(selection) {
+                        const ahsToRun = subConfigRef.current.actionHandlers.filter(a => a.trigger === "Click" && (a.name === "" || a.name === selection.column.name));
+                        props.actionRunner(ahsToRun, selection.item);
                     }
                 }
             });       
